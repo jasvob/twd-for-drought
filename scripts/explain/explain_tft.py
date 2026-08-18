@@ -272,6 +272,6 @@ if __name__ == "__main__":
                 'pred': series_preds[i*1000:(i+1)*1000],
                 'tstamp': series_tstamps[i*1000:(i+1)*1000],
             }
-            np.savez(explain_path.joinpath('%s_%i_%i_all_grshap.npz' % (args.config.stem, args.series_id, i), results=results))
+            np.savez(explain_path.joinpath('%s_%i_%i.npz' % (args.config.stem, args.series_id, i), results=results))
 
     print('Done')
