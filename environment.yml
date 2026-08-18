@@ -1,0 +1,45 @@
+name: twd-env
+channels:
+  - pytorch
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.11
+  - scikit-image
+  - scikit-learn
+  - h5py
+  - imageio
+  - ipywidgets
+  - jupyterlab
+  - jupyterlab_widgets
+  - mlflow
+  - pip
+  - pytorch>=2.0.0
+  - setuptools
+  - torchvision
+  - torchaudio
+  - tabulate
+  - tensorboard
+  - tqdm
+  - pip:
+    - bottleneck
+    - ipykernel
+    - ipython
+    - jsonargparse[signatures]>=4.18.0
+    - lightning
+    - lightning-utilities
+    - matplotlib
+    - numpy
+    - omegaconf
+    - pandas
+    - pillow
+    - plotly
+    - pyarrow
+    - pykml
+    - scipy
+    - seaborn
+    - tables
+    - torchmetrics>=0.7
+    - xarray
+    - dash
+    - dash-bootstrap-components
