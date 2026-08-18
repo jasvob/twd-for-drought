@@ -1,0 +1,208 @@
+trainer: 
+  accelerator: 'cuda'
+  devices: 1
+  max_epochs: 500
+  accumulate_grad_batches: 1
+  gradient_clip_val: 1.0
+  gradient_clip_algorithm: 'norm'
+  overfit_batches: 0.0
+  precision: 32
+  #log_every_n_steps: 50
+
+  callbacks:
+    - class_path: pytorch_lightning.callbacks.EarlyStopping
+      init_args:
+        monitor: 'val_smape'
+        patience: 30
+        min_delta: 1e-4
+        verbose: true
+    - class_path: pytorch_lightning.callbacks.ModelCheckpoint
+      init_args:
+        filename: 'epoch={epoch}-train_smape={train_smape:.3f}-val_smape={val_smape:.3f}'
+        monitor: 'val_smape'
+        mode: 'min'
+        save_top_k: 5
+        verbose: true
+        auto_insert_metric_name: false
+    - class_path: pytorch_lightning.callbacks.LearningRateMonitor
+      #init_args:
+      #  logging_interval: 'step'
+  
+  logger:
+    - class_path: pytorch_lightning.loggers.MLFlowLogger
+      init_args:
+        experiment_name: 'tft'
+        run_name: 'exp1'
+        tracking_uri: file:./experiments/${trainer.logger[0].init_args.experiment_name}
+
+data:
+  class_path: ml.pl.datamodules.datamodule.DataModule
+  init_args:
+    train_dataset:
+      class_path: ml.data.treenet_dataset.TreeNetTemporalDataset
+      init_args:
+        treenet_data_frame:
+          class_path:  utils.data.treenet_dataframe.TreeNetDataFrame
+          init_args: 
+            data_file_path: '/mydata/forestcast/jan/dataset-treenet-lm-new/'
+            metadata_file_path: '/mydata/forestcast/jan/dataset-treenet-lm-new/filt_metadata.parquet'
+            metadata_filter_fn: ''
+            treedata_filter_fn: ''
+            cache_path: '/mydata/forestcast/jan/treenet-paper/cache/cache_train_2hourly_all_merge_all'
+            data_filter_fn: 'ts.dt.year <= 2020'
+            min_trees_per_site: 1
+            equal_sequence_per_site: false
+            interpolate_data: false
+            drop_na_for_variables: ['twd', 'twd_norm', 'total_precip', 'rh', 'temp', 'rad', 'swp', 'vpd']
+            drop_na_for_metadata: ['genus_id', 'species_id']
+            resample_data: ['2H', '0H']
+            filter_growth_period: false
+            filter_by_temperature: null
+            filter_by_frost: true
+            filter_min_growth: 200.0
+            filter_min_twd: [0.9, 5.0]
+            merge_by_site: 'median'
+
+        input_feats: ['total_precip_log1p', 'rh', 'temp', 'swp_abs_log1p', 'vpd', 'rad']
+        exog_feats: ['genus_id', 'species_id']
+        target_feats: ['twd_norm']
+        seq_len: 576 
+        max_dist_timesteps: 1152
+        normalization:
+          - 'meanstd'
+          - 'meanstd'
+          - 'meanstd' 
+        norm_inputs: 
+          - [0.09446577727794647, 69.16653442382812, 18.329605102539062, 4.541141986846924, 0.785040557384491, 242.7092742919922]
+          - [0.3368465304374695, 18.571338653564453, 5.245357990264893, 1.7042675018310547, 0.6858100891113281, 303.7917175292969]  
+        norm_exog: 
+          - [0.0, 0.0]
+          - [1.0, 1.0]
+        norm_targets: 
+          - [0.6508476734161377]
+          - [0.807482898235321]
+        target_only_growth: 192
+        
+    val_dataset:
+      class_path: ml.data.treenet_dataset.TreeNetTemporalDataset
+      init_args:
+        treenet_data_frame:
+          class_path:  utils.data.treenet_dataframe.TreeNetDataFrame
+          init_args: 
+            data_file_path:  ${data.init_args.train_dataset.init_args.treenet_data_frame.init_args.data_file_path}
+            metadata_file_path: ${data.init_args.train_dataset.init_args.treenet_data_frame.init_args.metadata_file_path}
+            metadata_filter_fn: ${data.init_args.train_dataset.init_args.treenet_data_frame.init_args.metadata_filter_fn}
+            treedata_filter_fn: ${data.init_args.train_dataset.init_args.treenet_data_frame.init_args.treedata_filter_fn}
+            cache_path: '/mydata/forestcast/jan/treenet-paper/cache/cache_val_2hourly_all_merge_all'
+            data_filter_fn: 'ts.dt.year == 2021'
+            min_trees_per_site: ${data.init_args.train_dataset.init_args.treenet_data_frame.init_args.min_trees_per_site}
+            equal_sequence_per_site: ${data.init_args.train_dataset.init_args.treenet_data_frame.init_args.equal_sequence_per_site}
+            interpolate_data: ${data.init_args.train_dataset.init_args.treenet_data_frame.init_args.interpolate_data}
+            drop_na_for_variables: ${data.init_args.train_dataset.init_args.treenet_data_frame.init_args.drop_na_for_variables}
+            drop_na_for_metadata: ${data.init_args.train_dataset.init_args.treenet_data_frame.init_args.drop_na_for_metadata}
+            resample_data: ${data.init_args.train_dataset.init_args.treenet_data_frame.init_args.resample_data}
+            filter_growth_period: ${data.init_args.train_dataset.init_args.treenet_data_frame.init_args.filter_growth_period}
+            filter_by_temperature: ${data.init_args.train_dataset.init_args.treenet_data_frame.init_args.filter_by_temperature}
+            filter_by_frost: ${data.init_args.train_dataset.init_args.treenet_data_frame.init_args.filter_by_frost}
+            filter_min_growth: ${data.init_args.train_dataset.init_args.treenet_data_frame.init_args.filter_min_growth}
+            filter_min_twd: ${data.init_args.train_dataset.init_args.treenet_data_frame.init_args.filter_min_twd}
+            merge_by_site: ${data.init_args.train_dataset.init_args.treenet_data_frame.init_args.merge_by_site}
+        input_feats: ${data.init_args.train_dataset.init_args.input_feats}
+        exog_feats: ${data.init_args.train_dataset.init_args.exog_feats}
+        target_feats: ${data.init_args.train_dataset.init_args.target_feats}
+        seq_len: ${data.init_args.train_dataset.init_args.seq_len}
+        max_dist_timesteps: ${data.init_args.train_dataset.init_args.max_dist_timesteps}
+        normalization: ${data.init_args.train_dataset.init_args.normalization}
+        norm_inputs: ${data.init_args.train_dataset.init_args.norm_inputs}
+        norm_exog: ${data.init_args.train_dataset.init_args.norm_exog}
+        norm_targets: ${data.init_args.train_dataset.init_args.norm_targets}
+        target_only_growth: ${data.init_args.train_dataset.init_args.target_only_growth}
+
+    test_dataset:
+      class_path: ml.data.treenet_dataset.TreeNetTemporalDataset
+      init_args:
+        treenet_data_frame:
+          class_path:  utils.data.treenet_dataframe.TreeNetDataFrame
+          init_args: 
+            data_file_path:  ${data.init_args.train_dataset.init_args.treenet_data_frame.init_args.data_file_path}
+            metadata_file_path: ${data.init_args.train_dataset.init_args.treenet_data_frame.init_args.metadata_file_path}
+            metadata_filter_fn: ${data.init_args.train_dataset.init_args.treenet_data_frame.init_args.metadata_filter_fn}
+            treedata_filter_fn: ${data.init_args.train_dataset.init_args.treenet_data_frame.init_args.treedata_filter_fn}
+            cache_path: '/mydata/forestcast/jan/treenet-paper/cache/cache_test_2hourly_all_merge_all'
+            data_filter_fn: 'ts.dt.year > 2021'
+            min_trees_per_site: ${data.init_args.train_dataset.init_args.treenet_data_frame.init_args.min_trees_per_site}
+            equal_sequence_per_site: ${data.init_args.train_dataset.init_args.treenet_data_frame.init_args.equal_sequence_per_site}
+            interpolate_data: ${data.init_args.train_dataset.init_args.treenet_data_frame.init_args.interpolate_data}
+            drop_na_for_variables: ${data.init_args.train_dataset.init_args.treenet_data_frame.init_args.drop_na_for_variables}
+            drop_na_for_metadata: ${data.init_args.train_dataset.init_args.treenet_data_frame.init_args.drop_na_for_metadata}
+            resample_data: ${data.init_args.train_dataset.init_args.treenet_data_frame.init_args.resample_data}
+            filter_growth_period: ${data.init_args.train_dataset.init_args.treenet_data_frame.init_args.filter_growth_period}
+            filter_by_temperature: ${data.init_args.train_dataset.init_args.treenet_data_frame.init_args.filter_by_temperature}
+            filter_by_frost: ${data.init_args.train_dataset.init_args.treenet_data_frame.init_args.filter_by_frost}
+            filter_min_growth: ${data.init_args.train_dataset.init_args.treenet_data_frame.init_args.filter_min_growth}
+            filter_min_twd: ${data.init_args.train_dataset.init_args.treenet_data_frame.init_args.filter_min_twd}
+            merge_by_site: ${data.init_args.train_dataset.init_args.treenet_data_frame.init_args.merge_by_site}
+        input_feats: ${data.init_args.train_dataset.init_args.input_feats}
+        exog_feats: ${data.init_args.train_dataset.init_args.exog_feats}
+        target_feats: ${data.init_args.train_dataset.init_args.target_feats}
+        seq_len: ${data.init_args.train_dataset.init_args.seq_len}
+        max_dist_timesteps: ${data.init_args.train_dataset.init_args.max_dist_timesteps}
+        normalization: ${data.init_args.train_dataset.init_args.normalization}
+        norm_inputs: ${data.init_args.train_dataset.init_args.norm_inputs}
+        norm_exog: ${data.init_args.train_dataset.init_args.norm_exog}
+        norm_targets: ${data.init_args.train_dataset.init_args.norm_targets}
+        target_only_growth: ${data.init_args.train_dataset.init_args.target_only_growth}
+
+    batch_size: 128
+    num_workers: 4
+    val_size: 0.1
+
+model: 
+  class_path: ml.pl.modules.tft_module.TFTModule
+  init_args:
+    backcast_len: 384
+    forecast_len: 192
+    model: 
+      class_path: ml.models.tft.model.TemporalFusionTransformer
+      init_args:
+        num_time_variables: 7
+        num_time_categorical_variables: 0
+        num_static_variables: 0
+        num_static_categorical_variables: 0
+        time_category_counts: []
+        stat_category_counts: []
+        hist_variable_idxs: [0,1,2,3,4,5,6]
+        futr_variable_idxs: [0,1,2,3,4,5]
+        seq_len: 576
+        input_size: 7
+        output_size: 5
+        hidden_layer_size: 48
+        dropout_rate: 0.3
+        num_encoder_steps: 384
+        num_heads: 2
+
+    loss:       
+      class_path: ml.pl.losses.quantile_loss.QuantileLoss
+      init_args:
+        quantiles: [0.02, 0.15, 0.5, 0.85, 0.98]
+        quantile_aggr: 'mean'
+      
+    optimizer: 
+      class_path: torch.optim.RAdam
+      init_args:
+        lr: 0.001
+        weight_decay: 0.005
+        decoupled_weight_decay: true
+        
+    lr_scheduler:
+      class_path: ml.pl.schedulers.cosine_annealing_with_warmup.CosineAnnealingWarmupRestarts
+      init_args:
+        first_cycle_steps: 12980
+        cycle_mult: 2.0
+        max_lr: 0.001
+        min_lr: 0.000001
+        warmup_steps: 1298
+        gamma: 0.7
+
+    monitor: 'train_loss'
+    interval: 'step'
