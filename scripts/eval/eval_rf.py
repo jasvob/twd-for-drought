@@ -1,14 +1,5 @@
 import torch
-
-import os
-import sys
-sys.path.append('../')
-
 import numpy as np
-import pandas as pd
-
-import pytorch_lightning as pl
-import pytorch_lightning.cli as pl_cli
 from omegaconf import OmegaConf
 
 from torch.utils.data import DataLoader
@@ -163,6 +154,6 @@ if __name__ == "__main__":
         'inf_times': inf_times
     }
 
-    np.savez(eval_path.joinpath('%s.npz' % args.config.stem), results=results)
+    np.savez(eval_path.joinpath('%s.npz' % Path(args.config).stem), results=results)
 
     print('Done')

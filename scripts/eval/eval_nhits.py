@@ -1,14 +1,5 @@
 import torch
-
-import os
-import sys
-sys.path.append('../')
-
 import numpy as np
-import pandas as pd
-
-import pytorch_lightning as pl
-import pytorch_lightning.cli as pl_cli
 from omegaconf import OmegaConf
 
 from torch.utils.data import DataLoader
@@ -18,7 +9,6 @@ from ml.data.treenet_dataset import TreeNetTemporalDataset
 from ml.models.nhits.model import NHitsNet, NHitsBlock, IdentityBasis
 
 import time
-
 import argparse
 from pathlib import Path
 
@@ -239,7 +229,7 @@ if __name__ == "__main__":
             tstamps.append(tstamp.detach().cpu())
             site_ids.append(site_id.detach().cpu())
             series_ids.append(series_id.detach().cpu())
-
+            
     inps = torch.cat(inps)
     exogs = torch.cat(exogs)
     bcast_tgts = torch.cat(bcast_tgts)
@@ -268,6 +258,6 @@ if __name__ == "__main__":
         'inf_times': inf_times
     }
 
-    np.savez(eval_path.joinpath('%s.npz' % args.config.stem), results=results)
+    np.savez(eval_path.joinpath('%s.npz' % Path(args.config).stem), results=results)
 
     print('Done')
