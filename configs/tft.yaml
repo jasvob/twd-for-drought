@@ -44,11 +44,11 @@ data:
         treenet_data_frame:
           class_path:  utils.data.treenet_dataframe.TreeNetDataFrame
           init_args: 
-            data_file_path: '/mydata/forestcast/jan/dataset-treenet-lm-new/'
-            metadata_file_path: '/mydata/forestcast/jan/dataset-treenet-lm-new/filt_metadata.parquet'
+            data_file_path: '../dataset-treenet-lm-new/'
+            metadata_file_path: '../dataset-treenet-lm-new/filt_metadata.parquet'
             metadata_filter_fn: ''
             treedata_filter_fn: ''
-            cache_path: '/mydata/forestcast/jan/treenet-paper/cache/cache_train_2hourly_all_merge_all'
+            cache_path: 'resources/cache/cache_train_2hourly_all_merge_all'
             data_filter_fn: 'ts.dt.year <= 2020'
             min_trees_per_site: 1
             equal_sequence_per_site: false
@@ -93,7 +93,7 @@ data:
             metadata_file_path: ${data.init_args.train_dataset.init_args.treenet_data_frame.init_args.metadata_file_path}
             metadata_filter_fn: ${data.init_args.train_dataset.init_args.treenet_data_frame.init_args.metadata_filter_fn}
             treedata_filter_fn: ${data.init_args.train_dataset.init_args.treenet_data_frame.init_args.treedata_filter_fn}
-            cache_path: '/mydata/forestcast/jan/treenet-paper/cache/cache_val_2hourly_all_merge_all'
+            cache_path: 'resources/cache/cache_val_2hourly_all_merge_all'
             data_filter_fn: 'ts.dt.year == 2021'
             min_trees_per_site: ${data.init_args.train_dataset.init_args.treenet_data_frame.init_args.min_trees_per_site}
             equal_sequence_per_site: ${data.init_args.train_dataset.init_args.treenet_data_frame.init_args.equal_sequence_per_site}
@@ -128,7 +128,7 @@ data:
             metadata_file_path: ${data.init_args.train_dataset.init_args.treenet_data_frame.init_args.metadata_file_path}
             metadata_filter_fn: ${data.init_args.train_dataset.init_args.treenet_data_frame.init_args.metadata_filter_fn}
             treedata_filter_fn: ${data.init_args.train_dataset.init_args.treenet_data_frame.init_args.treedata_filter_fn}
-            cache_path: '/mydata/forestcast/jan/treenet-paper/cache/cache_test_2hourly_all_merge_all'
+            cache_path: 'resources/cache/cache_test_2hourly_all_merge_all'
             data_filter_fn: 'ts.dt.year > 2021'
             min_trees_per_site: ${data.init_args.train_dataset.init_args.treenet_data_frame.init_args.min_trees_per_site}
             equal_sequence_per_site: ${data.init_args.train_dataset.init_args.treenet_data_frame.init_args.equal_sequence_per_site}
