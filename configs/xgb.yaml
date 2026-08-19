@@ -43,8 +43,8 @@ data:
         treenet_data_frame:
           class_path:  utils.data.treenet_dataframe.TreeNetDataFrame
           init_args: 
-            data_file_path: '../dataset-treenet-lm-new/'
-            metadata_file_path: '../dataset-treenet-lm-new/filt_metadata.parquet'
+            data_file_path: 'resources/dataset-treenet/'
+            metadata_file_path: 'resources/dataset-treenet/metadata.parquet'
             metadata_filter_fn: ''
             treedata_filter_fn: ''
             cache_path: 'resources/cache/cache_train_2hourly_all_merge_all'
