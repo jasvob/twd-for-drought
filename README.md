@@ -3,9 +3,18 @@ Repository for the paper Forecasting Tree Water Deficit and Forest Drought Using
 
 This repository allows to reproduce results from the paper as well as run new experiments using the methodologies provided in the paper.
 
-This repository works with data which are stored on Zenodo under the following link:
+## Necessary data
 
-[https://zenodo](https://zenodo)
+This repository works with data which are stored on Zenodo under the following link:
+[https://doi.org/10.5281/zenodo.22006871](https://doi.org/10.5281/zenodo.22006871)
+
+Both `treenet-dataset.zip` and `resources.zip` should be downloaded. 
+
+The data should be unpacked into the following folder structure within the repository:
+```
+resources/
+resources/treenet-dataset/
+```
 
 ## 1. Setting up the environment
 To setup the environment necessary to run the code within this repository, please use the `environment.yml` file. You can setup e.g. [Conda](https://docs.conda.io/projects/conda/en/latest/user-guide/getting-started.html) environment as follows:
