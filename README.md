@@ -72,8 +72,8 @@ PYTHONPATH=. python scripts/viz/plot_variable_explanation.py --data_path resourc
 
 ## Acknowledgements
 This work has been conducted with the support of fundings from:
-* Swiss Data Science Center (Grant/Award: C21-15L)
-* WSL Institute for Snow and Avalanche Research SLF
+* Swiss Data Science Center 
+* Swiss Federal Institute for Forest, Snow and Landscape Research WSL
 
 ## License
 Code in this repository is available for research under the CC BY-NC license:
