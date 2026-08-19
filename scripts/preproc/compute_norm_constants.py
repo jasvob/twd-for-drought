@@ -20,8 +20,8 @@ arg_parser = argparse.ArgumentParser(
     description='Compute normalization constants for a dataset.',
 )
 
-arg_parser.add_argument('config', type=str, help='Path to the configuration file.')   
-arg_parser.add_argument('split', type=str, help='One of [train, val, test].')
+arg_parser.add_argument('--config', type=str, help='Path to the configuration file.')   
+arg_parser.add_argument('--split', type=str, help='One of [train, val, test].')
 
 if __name__ == "__main__":
     args = arg_parser.parse_args()

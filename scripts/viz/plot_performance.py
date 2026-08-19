@@ -1,6 +1,3 @@
-import sys
-sys.path.append('../')
-
 import numpy as np
 import pandas as pd
 
@@ -50,7 +47,7 @@ if __name__ == "__main__":
     ]
 
     # Prepare a text file to write to
-    out_file = open(tables_path.joinpath('performance_%s.txt' % args.model, 'w'))
+    out_file = open(tables_path.joinpath('performance_%s.txt' % args.model), 'w')
 
     # Calculate overall performance
     results = {}

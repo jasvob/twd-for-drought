@@ -1,10 +1,4 @@
 import torch
-
-import os
-import sys
-sys.path.append('../')
-
-import numpy as np
 import pandas as pd
 
 from scripts.viz.utils.data_utils import load_attributions
@@ -23,6 +17,7 @@ arg_parser = argparse.ArgumentParser(
 
 arg_parser.add_argument('--data_path', type=str, help='Path to the dataset folder.')   
 arg_parser.add_argument('--output_path', type=str, help='Path to where the outputs should be stored.')
+arg_parser.add_argument('--series_id', type=int, help='Series ID to plot explanations for.')
 arg_parser.add_argument('--model', type=str, default='nhits', help='One of [nhits, tft].')
 
 if __name__ == "__main__":
@@ -43,14 +38,14 @@ if __name__ == "__main__":
     # Abies alba: ['28', '693', '1163', '1382'] 
 
     # Load model evaluation data
-    series_ids =  ['166'] 
+    series_ids =  [args.series_id] 
     species_name = '_'.join(metadata_frame.loc[int(series_ids[0])][['tree_genus', 'tree_species']].to_list())
-    data_ser = load_attributions(Path(args.output_path).join_path('explain'), args.model, series_ids, only_attribution=False)
+    data_ser = load_attributions(Path(args.output_path).joinpath('explain'), args.model, series_ids, only_attribution=False)
 
     tstamp = data_ser['tstamps']
     pred = data_ser['preds']
     all_attributions = data_ser['attributions']
-    all_vars = data_ser['vars']
+    all_vars = data_ser['vars'].unsqueeze_(1).repeat(1, all_attributions.shape[1], 1, 1)
     forecast_len = data_ser['forecast_len']
     backcast_len = data_ser['backcast_len']
 
@@ -62,19 +57,19 @@ if __name__ == "__main__":
     avg_preds = torch.zeros_like(unique_tstamps, dtype=pred.dtype)
     avg_preds.index_reduce_(dim=0, index=unique_idxs, source=flat_preds, reduce='mean')
 
-    flat_feat_attrs = all_attributions[:, :, 0, :, :].mean(dim=2).flatten(end_dim=-2)
+    flat_feat_attrs = all_attributions[:, :, :, :].mean(dim=2).flatten(end_dim=-2)
     avg_feat_attrs = torch.zeros((unique_tstamps.shape[0], flat_feat_attrs.shape[1]), dtype=pred.dtype)
     avg_feat_attrs.index_reduce_(dim=0, index=unique_idxs, source=flat_feat_attrs, reduce='mean')
 
-    flat_feat_futr_attrs = all_attributions[:, :, 0, -forecast_len:, :].mean(dim=2).flatten(end_dim=-2)
+    flat_feat_futr_attrs = all_attributions[:, :, -forecast_len:, :].mean(dim=2).flatten(end_dim=-2)
     avg_feat_futr_attrs = torch.zeros((unique_tstamps.shape[0], flat_feat_futr_attrs.shape[1]), dtype=pred.dtype)
     avg_feat_futr_attrs.index_reduce_(dim=0, index=unique_idxs, source=flat_feat_futr_attrs, reduce='mean')
 
-    flat_feat_past_attrs = all_attributions[:, :, 0, :backcast_len, :].mean(dim=2).flatten(end_dim=-2)
+    flat_feat_past_attrs = all_attributions[:, :, :backcast_len, :].mean(dim=2).flatten(end_dim=-2)
     avg_feat_past_attrs = torch.zeros((unique_tstamps.shape[0], flat_feat_past_attrs.shape[1]), dtype=pred.dtype)
     avg_feat_past_attrs.index_reduce_(dim=0, index=unique_idxs, source=flat_feat_past_attrs, reduce='mean')
 
-    flat_vars = all_vars[:, :, 0, :, :].mean(dim=2).flatten(end_dim=-2)
+    flat_vars = all_vars[:, :, :, :].mean(dim=2).flatten(end_dim=-2)
     avg_flat_vars = torch.zeros((unique_tstamps.shape[0], flat_vars.shape[1]), dtype=pred.dtype)
     avg_flat_vars.index_reduce_(dim=0, index=unique_idxs, source=flat_vars, reduce='mean')
 
@@ -89,4 +84,4 @@ if __name__ == "__main__":
     input_features = [input_feat_names[feat] for feat in data_ser['input_feats']]
 
     fig = plot_attributions_series(unique_tstamps, avg_preds, avg_feat_futr_attrs, input_features)
-    fig.write_image(figures_path.joinpath('%s_%s_%s_future_covariates.png' % (args.model, species_name.lower(), series_ids[0])))
+    fig.write_image(figures_path.joinpath('explain_%s_%s_%s.png' % (args.model, species_name.lower(), series_ids[0])))

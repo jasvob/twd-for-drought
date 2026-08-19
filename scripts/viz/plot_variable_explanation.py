@@ -1,14 +1,8 @@
 import torch
-
-import os
-import sys
-sys.path.append('../')
-
 import numpy as np
 import pandas as pd
 
 from scripts.viz.utils.data_utils import load_attributions
-from scripts.viz.utils.plot_utils import plot_attributions_histogram, plot_attributions_boxplot
 
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
@@ -49,12 +43,12 @@ if __name__ == "__main__":
 
     # Load model evaluation data
     series_ids_all =  [
-        ['172', '1099_0', '1099_1', '1351', '1369'],
-        ['120', '853'],
-        ['1', '3', '166', '696', '1208', '1210', '1270', '1276', '1365', '1396'],
-        ['21', '27', '557', '686', '1180', '1206', '1268', '1381'],
-        ['18', '156', '160', '687', '849', '855', '1094', '1169', '1218', '1385'],
-        ['28', '693', '1163', '1382'],
+        ['1351'],#['172', '1099_0', '1099_1', '1351', '1369'],
+        ['853'],#['120', '853'],
+        ['166'],#['1', '3', '166', '696', '1208', '1210', '1270', '1276', '1365', '1396'],
+        ['557'],#['21', '27', '557', '686', '1180', '1206', '1268', '1381'],
+        ['160'],#['18', '156', '160', '687', '849', '855', '1094', '1169', '1218', '1385'],
+        ['1382'],#['28', '693', '1163', '1382'],
     ]
 
     series_names = ['Quercus pubescens', 'Quercus petraea', 'Pinus sylvestris', 'Picea abies', 'Fagus sylvatica', 'Abies alba']
@@ -85,23 +79,23 @@ if __name__ == "__main__":
         attr_flat = [torch.tensor([]) for _ in range(len(input_feat_names))]
         vars_flat = [torch.tensor([]) for _ in range(len(input_feat_names))]
         for serid in series_ids:
-            dser = load_attributions(Path(args.output_path).join_path('explain'), args.model, [serid], only_attribution=False)
+            dser = load_attributions(Path(args.output_path).joinpath('explain'), args.model, [serid], only_attribution=False)
             tstamp = dser['tstamps']
             forecast_len = dser['forecast_len']
             backcast_len = dser['backcast_len']
             pred = dser['preds']
             all_attributions = dser['attributions']
-            all_vars = dser['vars']
+            all_vars = dser['vars'].unsqueeze_(1).repeat(1, all_attributions.shape[1], 1, 1)
             input_features = dser['input_feats']
 
             all_vars[..., 0] = torch.expm1(all_vars[..., 0]) # total precipitation (convert from log1p to mm)
             all_vars[..., 3] = torch.log10(torch.expm1(all_vars[..., 3]) * 10) # swp (convert from log1p to pF)
             
             for feat_idx in range(len(input_feat_names)):
-                flat_vars = all_vars[:, :, 0, -forecast_len:, feat_idx].mean(dim=1).flatten()
+                flat_vars = all_vars[:, :, -forecast_len:, feat_idx].mean(dim=1).flatten()
                 unique_vars, unique_idxs = flat_vars.flatten().unique(return_inverse=True)
 
-                flat_feat_futr_attrs = all_attributions[:, :, 0, -forecast_len:, feat_idx].mean(dim=2).flatten()
+                flat_feat_futr_attrs = all_attributions[:, :, -forecast_len:, feat_idx].mean(dim=2).flatten()
                 avg_feat_futr_attrs = torch.zeros((unique_vars.shape[0], ), dtype=all_vars.dtype)
                 avg_feat_futr_attrs.index_reduce_(dim=0, index=unique_idxs, source=flat_feat_futr_attrs, reduce='mean')
 
@@ -182,4 +176,4 @@ if __name__ == "__main__":
 
     fig['layout']['annotations'][-1].xshift = -150
 
-    fig.write_image(figures_path.joinpath('compare_vars_%s.png' % args.model))
+    fig.write_image(figures_path.joinpath('explain_vars_%s.png' % args.model))

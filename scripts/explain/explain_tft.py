@@ -1,17 +1,10 @@
 import torch
 import torch.nn as nn
 
-import os
-import sys
-sys.path.append('../')
-
 from typing import Optional
 
 import numpy as np
-import pandas as pd
 
-import pytorch_lightning as pl
-import pytorch_lightning.cli as pl_cli
 from omegaconf import OmegaConf
 
 from torch.utils.data import DataLoader
@@ -35,7 +28,7 @@ arg_parser = argparse.ArgumentParser(
 arg_parser.add_argument('--config', type=str, help='Path to the configuration file.')   
 arg_parser.add_argument('--model_ckpt', type=str, help='Path to the model checkpoint.')   
 arg_parser.add_argument('--output_path', type=str, help='Path to where the outputs should be stored.')
-arg_parser.add_argument('--series_id', type=str, help='One of [train, val, test].')
+arg_parser.add_argument('--series_id', type=int, help='Which tree series to explain.')
 
 if __name__ == "__main__":
     args = arg_parser.parse_args()

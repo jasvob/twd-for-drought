@@ -1,10 +1,4 @@
-import torch
 
-import os
-import sys
-sys.path.append('../')
-
-import numpy as np
 import pandas as pd
 
 from scripts.viz.utils.data_utils import load_data
@@ -90,4 +84,4 @@ if __name__ == "__main__":
                 )
             )
 
-            fig.write_image(figures_path.joinpath('forecasts_%s_%i_%i.png' % (args.model, species_name.lower(), series_idx, sample_idx)))
+            fig.write_image(figures_path.joinpath('%s_%s_%i_%i.png' % (args.model, species_name.lower(), series_idx, sample_idx)))

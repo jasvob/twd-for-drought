@@ -55,7 +55,7 @@ def load_attributions(data_path : str, experiment_name : str, series_list : List
     all_preds = []
     all_tstamps = []
     for series_id in series_list:
-        dat = np.load('%s/%s_%s_all_grshap.npz' % (data_path, experiment_name, series_id), allow_pickle=True)['results'].item()
+        dat = np.load('%s/%s_%s.npz' % (data_path, experiment_name, series_id), allow_pickle=True)['results'].item()
 
         all_attributions.append(torch.from_numpy(dat['all_attributions']))
         backcast_len.append(dat['backcast_len'])
@@ -105,7 +105,7 @@ def load_attributions_per_series(data_path : str, experiment_name : str, series_
     all_preds = []
     all_tstamps = []
     for series_id in series_list:
-        dat = np.load('%s/%s_%s_all_grshap.npz' % (data_path, experiment_name, series_id), allow_pickle=True)['results'].item()
+        dat = np.load('%s/%s_%s.npz' % (data_path, experiment_name, series_id), allow_pickle=True)['results'].item()
 
         all_attributions.append(torch.from_numpy(dat['all_attributions']))
         backcast_len.append(dat['backcast_len'])
