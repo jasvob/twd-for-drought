@@ -6,9 +6,9 @@ This repository allows to reproduce results from the paper as well as run new ex
 This repository works with data which are stored on Zenodo under the following link:
 
 ## 1. Setting up the environment
-To setup the environment necessary to run the code within this repository, please use the environment.yml file. You can setup e.g. conda environment as follows:
+To setup the environment necessary to run the code within this repository, please use the `environment.yml` file. You can setup e.g. [Conda](https://docs.conda.io/projects/conda/en/latest/user-guide/getting-started.html) environment as follows:
 ```
-conda env create --file=environment.yaml
+conda env create -f environment.yaml
 ```
 
 This will create an environment with the name `twd-env`, which you can then activate by running
@@ -20,7 +20,7 @@ conda activate twd-env
 Each model has its configuration file, which is available within the `configs/` folder. You can use those configuration files as an inspiration, shall you desire to use this repository to train a different model or change model configuration.
 
 ### Deep learning models
-Model configuration and training is facilitated through PyTorch Lightning CLI. Training run can be started via the Lightning CLI as follows:
+Model configuration and training is facilitated through PyTorch [Lightning CLI](https://lightning.ai/). Training run can be started via the Lightning CLI as follows:
 ```
 python main.py fit -c configs/nhits.yaml 
 ```
@@ -69,3 +69,12 @@ Analysis of influence of different variables on TWD can be generated using:
 PYTHONPATH=. python scripts/viz/plot_variable_explanation.py --data_path resources/dataset-treenet/ --output_path resources/  --model nhits
 ```
 **Disclaimer: Please note that the latter only produces a reduced plot using sample data within `resources/explain/`, as storing the full explanations for all series within this study would require too much space. In order to generate the full figure from the manuscript, you first need to generate tree series explanations using the scripts from above and then make minor changes to the script in order for it to include all tree series.**
+
+## Acknowledgements
+This work has been conducted with the support of fundings from:
+* Swiss Data Science Center (Grant/Award: C21-15L)
+* WSL Institute for Snow and Avalanche Research SLF
+
+## License
+Code in this repository is available for research under the CC BY-NC license:
+[https://creativecommons.org/licenses/by-nc/4.0/](https://creativecommons.org/licenses/by-nc/4.0/)
