@@ -28,7 +28,7 @@ def worker_init_fn(id: int):
 
 
 class DataModule(pl.LightningDataModule):
-    def __init__(self, train_dataset : Dataset, test_dataset : Dataset, val_dataset : Optional[Dataset] = None, val_size : float = 0.1, batch_size : int = 32, num_workers : int = 1, pin_memory : bool = False, persistent_workers : bool = False, class_balancing : bool = False):
+    def __init__(self, train_dataset : Dataset, test_dataset : Dataset, val_dataset : Optional[Dataset] = None, val_size : float = 0.1, batch_size : int = 32, num_workers : int = 1, pin_memory : bool = True, persistent_workers : bool = False, generator_random_seed : int = 42, class_balancing : bool = False):
         super().__init__()
 
         self.train_dataset = train_dataset
@@ -40,6 +40,8 @@ class DataModule(pl.LightningDataModule):
         self.num_workers = num_workers
         self.pin_memory = pin_memory
         self.persistent_workers = persistent_workers
+
+        self.generator_random_seed = generator_random_seed
 
         self.class_balancing = class_balancing
 
@@ -56,10 +58,7 @@ class DataModule(pl.LightningDataModule):
             if self.val_dataset is None:
                 train_length = int(len(self.train_dataset) * (1.0 - self.val_size))
                 val_length = int(len(self.train_dataset) - train_length)
-                self.train_dataset, self.val_dataset = random_split(self.train_dataset, [train_length, val_length])
-
-        #if stage is None or stage == "test":
-        #    pass
+                self.train_dataset, self.val_dataset = random_split(self.train_dataset, [train_length, val_length], torch.Generator().manual_seed(self.generator_random_seed))
 
     def train_dataloader(self) -> DataLoader:
         sampler = None
