@@ -2,6 +2,8 @@ import numpy as np
 import torch
 import pandas as pd
 
+import os
+
 from torch.utils.data import Dataset
 from typing import Tuple, List, Optional
 
@@ -219,14 +221,73 @@ class TreeNetTemporalDataset(TreeNetDataset):
             Whether to return the timestamp for each sample or not. Defaults to False.
     """
 
-    def __init__(self, treenet_data_frame : TreeNetDataFrame, input_feats : List[str], exog_feats : List[str],  target_feats : List[str], seq_len : int, max_dist_timesteps : int, normalization : Tuple[str, str, str] = ('none', 'none', 'none'), norm_inputs : Tuple[List[float], List[float]] = None, norm_exog : Tuple[List[float], List[float]] = None, norm_targets : Tuple[List[float], List[float]] = None, target_only_growth : Optional[int] = None, return_timestamp : bool = False) -> None:
+    def __init__(self, treenet_data_frame : TreeNetDataFrame, input_feats : List[str], exog_feats : List[str],  target_feats : List[str], seq_len : int, max_dist_timesteps : int, cache_path : Optional[str] = None, selected_input_feats : Optional[List[int]] = None, normalization : Tuple[str, str, str] = ('none', 'none', 'none'), norm_inputs : Tuple[List[float], List[float]] = None, norm_exog : Tuple[List[float], List[float]] = None, norm_targets : Tuple[List[float], List[float]] = None, target_only_growth : Optional[int] = None, return_timestamp : bool = False) -> None:
         super(TreeNetTemporalDataset, self).__init__(treenet_data_frame, input_feats, exog_feats, target_feats, normalization, norm_inputs, norm_exog, norm_targets, target_only_growth, return_timestamp)
 
         self.seq_len = seq_len
         self.max_dist_timesteps = max_dist_timesteps
-
+        self.cache_path = cache_path
+        if selected_input_feats is None:
+            self.selected_input_feats = list(range(len(self.input_feats)))
+        else:
+            self.selected_input_feats = selected_input_feats
+            # Don't forget to only select the input normalization constants we need in this case
+            self.norm_inputs = (self.norm_inputs[0][self.selected_input_feats], self.norm_inputs[1][self.selected_input_feats])
+        
         # Use this data frame to get the sequence indices
         self.sequence_idxs = get_sequence_indices_treenet_tree(self.df_indexer, window_size=seq_len, max_dist=max_dist_timesteps, index_filter=self.df_indexer.index.to_list(), target_only_growth=self.target_only_growth)          
+
+        # Preprocess the data for fast dataloading later during training
+        if cache_path is not None:
+            print('Using cache.')
+            inp_memmap_path = cache_path + '_inputs.memmap'
+            exog_memmap_path = cache_path + '_exog.memmap'
+            tgt_memmap_path = cache_path + '_targets.memmap'
+            if os.path.exists(inp_memmap_path) and os.path.exists(exog_memmap_path) and os.path.exists(tgt_memmap_path):
+                print('Loading data from memory map...')
+                self.inp_data = np.memmap(inp_memmap_path, dtype='float32', mode='r', shape=(len(self.sequence_idxs), self.seq_len, len(self.input_feats)))
+                self.exog_data = np.memmap(exog_memmap_path, dtype='float32', mode='r', shape=(len(self.sequence_idxs), self.seq_len, len(self.exog_feats)))
+                self.tgt_data = np.memmap(tgt_memmap_path, dtype='float32', mode='r', shape=(len(self.sequence_idxs), self.seq_len, len(self.target_feats)))
+                print('Done.')
+            else:
+                print('No memory map found, generating data...')
+                self.inp_data = np.memmap(inp_memmap_path, dtype='float32', mode='w+', shape=(len(self.sequence_idxs), self.seq_len, len(self.input_feats)))
+                self.exog_data = np.memmap(exog_memmap_path, dtype='float32', mode='w+', shape=(len(self.sequence_idxs), self.seq_len, len(self.exog_feats)))
+                self.tgt_data = np.memmap(tgt_memmap_path, dtype='float32', mode='w+', shape=(len(self.sequence_idxs), self.seq_len, len(self.target_feats)))
+                            
+                for index in range(len(self.sequence_idxs)):
+                    print('Processing ', index, '/', len(self.sequence_idxs, '...'))
+                    # Reindex
+                    index_site_id, _, index_series_id, _, index_start_date, index_end_date = self.sequence_idxs[index]
+                    
+                    # Get spatial data frame in between start and end index
+                    df_tree = self.treenet_data_frame.get_tree_datetime_sequence_data_frame(index_site_id, index_series_id, index_start_date, index_end_date)
+                    df_tree_meta = self.treenet_data_frame.get_tree_metadata(index_series_id)
+            
+                    self.inp_data[index, :, :] = df_tree.loc[:, self.input_feats].apply(pd.to_numeric).to_numpy().astype(np.float32)
+                    self.exog_data[index, :, :] = df_tree_meta.loc[self.exog_feats].apply(pd.to_numeric).to_numpy().astype(np.float32)
+                    self.tgt_data[index, :, :] = df_tree.loc[:, self.target_feats].apply(pd.to_numeric).to_numpy().astype(np.float32)
+                print('Done.')
+        else:
+            print('Not using cache.')
+            print('Preprocessing data in memory...')
+            self.inp_data = np.zeros(shape=(len(self.sequence_idxs), self.seq_len, len(self.input_feats)))
+            self.exog_data = np.zeros(shape=(len(self.sequence_idxs), self.seq_len, len(self.exog_feats)))
+            self.tgt_data = np.zeros(shape=(len(self.sequence_idxs), self.seq_len, len(self.target_feats)))
+                        
+            for index in range(len(self.sequence_idxs)):
+                print('Processing ', index, '/', len(self.sequence_idxs, '...'))
+                # Reindex
+                index_site_id, _, index_series_id, _, index_start_date, index_end_date = self.sequence_idxs[index]
+                
+                # Get spatial data frame in between start and end index
+                df_tree = self.treenet_data_frame.get_tree_datetime_sequence_data_frame(index_site_id, index_series_id, index_start_date, index_end_date)
+                df_tree_meta = self.treenet_data_frame.get_tree_metadata(index_series_id)
+        
+                self.inp_data[index, :, :] = df_tree.loc[:, self.input_feats].apply(pd.to_numeric).to_numpy().astype(np.float32)
+                self.exog_data[index, :, :] = df_tree_meta.loc[self.exog_feats].apply(pd.to_numeric).to_numpy().astype(np.float32)
+                self.tgt_data[index, :, :] = df_tree.loc[:, self.target_feats].apply(pd.to_numeric).to_numpy().astype(np.float32)
+            print('Done.')
 
     def __len__(self) -> int:
         return len(self.sequence_idxs)
@@ -245,19 +306,16 @@ class TreeNetTemporalDataset(TreeNetDataset):
             (torch.Tensor, torch.Tensor) : Tuple of tensors where the first one represents input and second one the target.
         """
         # Reindex
-        index_site_id, _, index_series_id, _, index_start_date, index_end_date = self.sequence_idxs[index]
+        index_site_id, _, index_series_id, _, _, index_end_date = self.sequence_idxs[index]
         
-        # Get spatial data frame in between start and end index
-        df_tree = self.treenet_data_frame.get_tree_datetime_sequence_data_frame(index_site_id, index_series_id, index_start_date, index_end_date)
-        df_tree_meta = self.treenet_data_frame.get_tree_metadata(index_series_id)
-
-        inps = torch.tensor(df_tree.loc[:, self.input_feats].apply(pd.to_numeric).to_numpy(), dtype=torch.float32)
+        inps = torch.from_numpy(np.array(self.inp_data[index, :, :]))
+        inps = inps[:, self.selected_input_feats]                
         inps = self.normalize_data(inps, self.normalization[0], self.norm_inputs)
 
-        exog = torch.tensor(df_tree_meta.loc[self.exog_feats].apply(pd.to_numeric).to_numpy(), dtype=torch.float32)
+        exog = torch.from_numpy(np.array(self.exog_data[index, :, :]))
         exog = self.normalize_data(exog, self.normalization[1], self.norm_exog)
 
-        tgts = torch.tensor(df_tree.loc[:, self.target_feats].apply(pd.to_numeric).to_numpy(), dtype=torch.float32)
+        tgts = torch.from_numpy(np.array(self.tgt_data[index, :, :]))
         tgts = self.normalize_data(tgts, self.normalization[2], self.norm_targets)
 
         if self.return_timestamp:
