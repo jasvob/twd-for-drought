@@ -17,6 +17,7 @@ arg_parser = argparse.ArgumentParser(
 
 arg_parser.add_argument('--data_path', type=str, help='Path to the dataset folder.')   
 arg_parser.add_argument('--output_path', type=str, help='Path to where the outputs should be stored.')
+arg_parser.add_argument('--eval_folder', type=str, default='eval', help='Folder with model evaluations.')
 arg_parser.add_argument('--model', type=str, default='nhits', help='One of [nhits, nhits_noswp, tft, tft_noswp, rf, xgb].')
 
 
@@ -34,16 +35,17 @@ if __name__ == "__main__":
     metadata_frame = metadata_frame.set_index('series_id')
 
     # Load model evaluation data
-    data_ser = load_data(Path(args.output_path).joinpath('eval'), args.model)
+    data_ser = load_data(Path(args.output_path).joinpath(args.eval_folder), args.model)
 
     # Define which series IDs to consider in this evaluation
     filter_sids = [
-        172, 1099, 1351, 1369, # Quercus pubescens
-        120, 853, # Quercus petraea:
-        1, 3, 166, 696, 1208, 1210, 1270, 1276, 1365, 1396, # Pinus sylvestris
-        21, 27, 557, 686, 1180, 1206, 1268, 1381, # Picea Abies
-        18, 156, 160, 687, 849, 855, 1094, 1169, 1218, 1385, # Fagus sylvatica
-        28, 693, 1163, 1382 # Abies alba
+        172, 1099, 1351, 1369, # Quercus pubescens (zero series - 1142)
+        120, 853, # Quercus petraea (zero series - 572, 1053)
+        1, 3, 166, 696, 1208, 1210, 1270, 1276, 1365, 1396, # Pinus sylvestris (zero series - 911, 1118, )
+        21, 27, 221, 557, 686, 1180, 1206, 1268, 1381, # Picea Abies (zero series - 75, 405, 663, 818, 1077, 1394)
+        18, 156, 160, 687, 849, 855, 1094, 1112, 1162, 1169, 1218, 1385, # Fagus sylvatica (zero series - 72, 661, 1050, 1232, 1391)
+        28, 693, 1163, 1382, # Abies alba (zero series - 666, 831)
+        1167, 1366, # Fraxinus excelsior (zero series - 668)
     ]
 
     # Prepare a text file to write to

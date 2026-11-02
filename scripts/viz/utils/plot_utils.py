@@ -125,6 +125,7 @@ def plot_forecast_sample_overlay(data_dict, data_mask, sample_idx : int, fig : g
             ))
 
 
+
 def subplot_forecast_sample_overlay(data_dict, data_mask, sample_idx : int, fig : go.Figure, row : int, col : int, forecast_color : Tuple[int, int, int], show_target : bool = True, show_backcast : bool = False, show_quantiles : bool = False, series_title : str = 'Forecast', minutes_per_day : int = 86400):
     quant_idx = data_dict['forecasts'].shape[-1] // 2
 
@@ -247,72 +248,112 @@ def plot_attributions_boxplot(fig : go.Figure, attrs_all : np.array, feat_names 
         )
     )
 
-def plot_attributions_series(timestamps : np.array, predictions : np.array, attributions : np.array, feature_list : List[str]) -> go.Figure:
-    fig = make_subplots(specs=[[{"secondary_y": True}]])
 
-    fig.add_trace(
-        go.Scatter(
-            x=pd.to_datetime(timestamps * 10**9),
-            y=predictions,
-            mode='lines',
-            line_width=3,
-            marker_color='green',
-        ),
-        secondary_y=True
+# Colour-blind-safe bar colours, one per feature (in feature_list order).
+inp_names = ['prec', 'rh', 'temp', 'swp', 'vpd', 'rad']
+inp_colors = ['rgba(0, 168, 196, 1.0)', 'rgba(222, 26, 82, 1.0)', 'rgba(193, 187, 0, 1.0)', 'rgba(181, 61, 181, 1.0)', 'rgba(212, 150, 0, 1.0)', 'rgba(15, 130, 222, 1.0)']
+     
+ 
+def plot_attributions_series(timestamps_list : List[np.array],
+                                predictions_list : List[np.array],
+                                attributions_list : List[np.array],
+                                feature_list : List[str],
+                                subplot_titles : List[str] = None,
+                                bar_freq : str = '6h',
+                                shared_xaxes : bool = False,
+                                row_height : int = 350) -> go.Figure:
+    n_rows = len(timestamps_list)
+
+    fig = make_subplots(
+        rows=n_rows, cols=1,
+        specs=[[{"secondary_y": True}] for _ in range(n_rows)],
+        subplot_titles=subplot_titles,
+        shared_xaxes=shared_xaxes,
+        vertical_spacing=0.08,
     )
 
-    fig.add_trace(
-        go.Heatmap(
-            z=attributions.transpose(1,0)[:6, :] / attributions[:, :6].abs().max(),
-            x=pd.to_datetime(timestamps * 10**9),
-            y=-1.5 + np.arange(attributions.shape[1]) * 1.5,
-            colorscale=px.colors.sequential.RdBu_r[1:10],
-            zmin=-1.0,
-            zmax=1.0,
-            colorbar=dict(
-                title=dict(
-                    text='Contribution',
-                    font_size=18
+    for r, (timestamps, predictions, attributions) in enumerate(
+            zip(timestamps_list, predictions_list, attributions_list), start=1):
+
+        show_legend = (r == 1)   # legend entries only once; legendgroup links them across rows
+
+        x = pd.to_datetime(timestamps * 10**9)
+
+        # works for torch tensors and numpy arrays
+        to_np = lambda a: a.detach().cpu().numpy() if hasattr(a, 'detach') else np.asarray(a)
+        attr = to_np(attributions)
+        preds = to_np(predictions)
+
+        n_features = attr.shape[1] - 1
+        attr = attr[:, :n_features] / np.abs(attr[:, :n_features]).max()   # same scaling as before (per series)
+
+        # Average contributions into wider bins for the bars; TWD line keeps full resolution
+        attr_df = pd.DataFrame(attr, index=x)
+        if bar_freq is not None:
+            attr_df = attr_df.resample(bar_freq).mean().dropna()
+            attr_df.index = attr_df.index + pd.Timedelta(bar_freq) / 2   # centre bars on their bin
+        attr = attr_df.to_numpy()
+
+        # Contribution bars (primary axis, placed on the right)
+        for i in range(n_features):
+            fig.add_trace(
+                go.Bar(
+                    x=attr_df.index,
+                    y=attr[:, i],
+                    name=feature_list[i],
+                    marker_color=inp_colors[i],
+                    marker_line_width=0.5,
+                    legendgroup=feature_list[i],
+                    showlegend=show_legend,
                 ),
-                tickvals=[1.0, 0.5, 0.0, -0.5, -1.0],
-                ticktext=['pos. high', 'pos. low', 'none', 'neg. low', 'neg. high'],
-                x=1.0
+                row=r, col=1, secondary_y=False
             )
-        ),
-        secondary_y=False
-    )
+
+        # Forecasted TWD (secondary axis, placed on the left)
+        fig.add_trace(
+            go.Scatter(
+                x=x,
+                y=preds,
+                mode='lines',
+                line_width=3,
+                marker_color='rgba(20, 40, 90, 1.0)',
+                name='Forecasted TWD',
+                legendgroup='Forecasted TWD',
+                showlegend=show_legend,
+            ),
+            row=r, col=1, secondary_y=True
+        )
+
+        # Centre the contribution axis on 0
+        stack_max = max(np.clip(attr, 0, None).sum(axis=1).max(),
+                        -np.clip(attr, None, 0).sum(axis=1).min())
+
+        fig.update_yaxes(
+            title=dict(text='Contribution', font_size=16),
+            side='right',
+            zeroline=True, zerolinecolor='grey', zerolinewidth=1,
+            range=[-1.05 * stack_max, 1.05 * stack_max],
+            row=r, col=1, secondary_y=False,
+        )
+        fig.update_yaxes(
+            title=dict(text='Forecasted TWD', font_size=16),
+            side='left',
+            showgrid=False,
+            tickmode='auto',
+            row=r, col=1, secondary_y=True,
+        )
+
+    # x-axis title only on the bottom row
+    fig.update_xaxes(title=dict(text='Date & Time', font_size=16), row=n_rows, col=1)
 
     fig.update_layout(
         width=1200,
-        height=400,
-        yaxis=dict(
-            title=dict(
-                text='Input Features',
-                font_size=16
-            ),
-            tickmode='array',
-            tickvals=-0.75 + np.array(list(range(len(feature_list)))) * 1.5,
-            ticktext=feature_list
-        ),
-        margin=dict(
-            l=20,
-            r=20,
-            t=20,
-            b=20
-        ),
+        height=row_height * n_rows,
+        barmode='relative',          # positives stack up from 0, negatives down
+        bargap=0,
+        legend=dict(orientation='h', yanchor='bottom', y=1.02, xanchor='left', x=0),
+        margin=dict(l=20, r=20, t=60, b=20),
         font=dict(size=16),
-        xaxis=dict(
-            title=dict(
-                text='Date & Time',
-                font_size=16,
-            )
-        ),
-        yaxis2=dict(
-            title=dict(
-                text='Forecasted TWD',
-                font_size=16,
-            )
-        )
     )
 
     return fig

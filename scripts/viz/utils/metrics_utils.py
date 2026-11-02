@@ -4,8 +4,11 @@ import numpy as np
 import sys
 
 from typing import Optional, List, Tuple
+from torchmetrics import R2Score
 
 def overall_performance(data_dict, filter_sids : Optional[List[int]] = None, experiment_name : str = '', file=sys.stdout):
+    r2score = R2Score(multioutput='raw_values')
+
     if filter_sids is not None:
         mask = np.isin(data_dict['series_ids'], filter_sids)
     else:
@@ -28,12 +31,13 @@ def overall_performance(data_dict, filter_sids : Optional[List[int]] = None, exp
     wsmape = 100 * torch.mean(torch.sum(torch.abs(forecasts_filt_clamp - targets_filt_clamp), dim=1) / torch.sum(torch.abs(forecasts_filt_clamp) + torch.abs(targets_filt_clamp), dim=1))
     male = torch.mean(torch.abs(torch.log(forecasts_filt_clamp / targets_filt_clamp)))
     mase = torch.mean(torch.abs(forecasts_filt_clamp - targets_filt_clamp) / (torch.mean(torch.abs(naive_filt_clamp - targets_filt_clamp), dim=-1, keepdims=True) + 1)) 
+    r2 = r2score(forecasts_filt_clamp, targets_filt_clamp).mean()
 
     print('All data - %s' % experiment_name, file=file)
-    print('-------------------------------------------------------------------------------------------------------', file=file)
-    print('MAE \t\t MedianAE \t SMAPE \t\t MASE \t\t NMAE \t\t WMAPE \t\t MALE', file=file)
-    print('-------------------------------------------------------------------------------------------------------', file=file)
-    print('%.4f \t\t %.4f \t %.4f \t %.4f \t %.4f \t %.4f \t %.4f' % (mae, medianae, smape, mase, nmae, wsmape, male), file=file)
+    print('-----------------------------------------------------------------------------------------------------------------------', file=file)
+    print('MAE \t\t MedianAE \t SMAPE \t\t MASE \t\t NMAE \t\t WMAPE \t\t MALE \t\t R2', file=file)
+    print('-----------------------------------------------------------------------------------------------------------------------', file=file)
+    print('%.4f \t\t %.4f \t %.4f \t %.4f \t %.4f \t %.4f \t %.4f \t %.4f' % (mae, medianae, smape, mase, nmae, wsmape, male, r2), file=file)
 
     medianae_all = torch.median(torch.abs(forecasts_filt_clamp - targets_filt_clamp), dim=0)[0]
     mae_all = torch.mean(torch.abs(forecasts_filt_clamp - targets_filt_clamp), dim=0)
@@ -42,6 +46,7 @@ def overall_performance(data_dict, filter_sids : Optional[List[int]] = None, exp
     wsmape_all = 100 * torch.mean(torch.sum(torch.abs(forecasts_filt_clamp - targets_filt_clamp), dim=1) / torch.sum(torch.abs(forecasts_filt_clamp) + torch.abs(targets_filt_clamp), dim=1), dim=0)
     male_all = torch.mean(torch.abs(torch.log(forecasts_filt_clamp / targets_filt_clamp)), dim=0)
     mase_all = torch.mean(torch.abs(forecasts_filt_clamp - targets_filt_clamp) / (torch.mean(torch.abs(naive_filt_clamp - targets_filt_clamp), dim=-1, keepdims=True) + 1), dim=0) 
+    r2_all = r2score(forecasts_filt_clamp, targets_filt_clamp)
 
     return {
         'medianae': medianae_all.numpy(),
@@ -51,6 +56,7 @@ def overall_performance(data_dict, filter_sids : Optional[List[int]] = None, exp
         'wsmape': wsmape_all.numpy(),
         'male': male_all.numpy(),
         'mase': mase_all.numpy(),
+        'r2': r2_all.numpy()
     }
 
 def species_stats(data_dict, metadata_frame, filter_sids : List[int], experiment_name : str = '', file=sys.stdout):  
@@ -78,13 +84,15 @@ def species_stats(data_dict, metadata_frame, filter_sids : List[int], experiment
 
 
 def per_species_performance(data_dict, metadata_frame, filter_sids : Optional[List[int]] = None, experiment_name : str = '', file=sys.stdout):  
+    r2score = R2Score(multioutput='raw_values')
+
     quant_idx = data_dict['forecasts'].shape[-1] // 2
     forecast_horizon = data_dict['forecasts'].shape[-2]
     
     print('Per-species data - %s' % experiment_name, file=file)
-    print('-------------------------------------------------------------------------------------------------------------------------------', file=file)
-    print('Species Name \t\t\t MAE \t\t MedianAE \t SMAPE \t\t MASE \t\t NMAE \t\t WMAPE \t\t MALE', file=file)
-    print('-------------------------------------------------------------------------------------------------------------------------------', file=file)
+    print('-----------------------------------------------------------------------------------------------------------------------------------------------', file=file)
+    print('Species Name \t\t\t MAE \t\t MedianAE \t SMAPE \t\t MASE \t\t NMAE \t\t WMAPE \t\t MALE \t\t R2', file=file)
+    print('-----------------------------------------------------------------------------------------------------------------------------------------------', file=file)
     spec_name_all = []
     medianae_all = []
     mae_all = []
@@ -93,6 +101,7 @@ def per_species_performance(data_dict, metadata_frame, filter_sids : Optional[Li
     wsmape_all = []
     male_all = []
     mase_all = []
+    r2_all = []
 
     meatadata_frame_cat = metadata_frame.copy()
     meatadata_frame_cat['genus_species'] = meatadata_frame_cat.tree_genus + ' ' + meatadata_frame_cat.tree_species
@@ -123,7 +132,8 @@ def per_species_performance(data_dict, metadata_frame, filter_sids : Optional[Li
             wsmape = 100 * torch.mean(torch.sum(torch.abs(forecasts_filt_clamp - targets_filt_clamp), dim=1) / torch.sum(torch.abs(forecasts_filt_clamp) + torch.abs(targets_filt_clamp), dim=1))
             male = torch.mean(torch.abs(torch.log(forecasts_filt_clamp / targets_filt_clamp)))
             mase = torch.mean(torch.abs(forecasts_filt_clamp - targets_filt_clamp) / (torch.mean(torch.abs(naive_filt_clamp - targets_filt_clamp), dim=-1, keepdims=True) + 1)) 
-            print('%s \t %.4f \t %.4f \t %.4f \t %.4f \t %.4f \t %.4f \t %.4f' % (species_name.ljust(20), mae, medianae, smape, mase, nmae, wsmape, male), file=file)  
+            r2 = r2score(forecasts_filt_clamp, targets_filt_clamp).mean()
+            print('%s \t %.4f \t %.4f \t %.4f \t %.4f \t %.4f \t %.4f \t %.4f \t %.4f' % (species_name.ljust(20), mae, medianae, smape, mase, nmae, wsmape, male, r2), file=file)  
             
             spec_name_all.append(species_name)
             medianae_all.append(torch.median(torch.abs(forecasts_filt_clamp - targets_filt_clamp), dim=0)[0])
@@ -133,6 +143,7 @@ def per_species_performance(data_dict, metadata_frame, filter_sids : Optional[Li
             wsmape_all.append(100 * torch.mean(torch.sum(torch.abs(forecasts_filt_clamp - targets_filt_clamp), dim=1) / torch.sum(torch.abs(forecasts_filt_clamp) + torch.abs(targets_filt_clamp), dim=1), dim=0))
             male_all.append(torch.mean(torch.abs(torch.log(forecasts_filt_clamp / targets_filt_clamp)), dim=0))
             mase_all.append(torch.mean(torch.abs(forecasts_filt_clamp - targets_filt_clamp) / (torch.mean(torch.abs(naive_filt_clamp - targets_filt_clamp), dim=-1, keepdims=True) + 1), dim=0))
+            r2_all.append(r2score(forecasts_filt_clamp, targets_filt_clamp))
 
     spec_name_all = np.stack(spec_name_all)
     medianae_all = np.stack(medianae_all)
@@ -142,6 +153,7 @@ def per_species_performance(data_dict, metadata_frame, filter_sids : Optional[Li
     wsmape_all = np.stack(wsmape_all)
     male_all = np.stack(male_all)
     mase_all = np.stack(mase_all)
+    r2_all = np.stack(r2_all)
 
     return {
         'spec_name': spec_name_all,
@@ -152,16 +164,19 @@ def per_species_performance(data_dict, metadata_frame, filter_sids : Optional[Li
         'wsmape': wsmape_all,
         'male': male_all,
         'mase': mase_all,
+        'r2': r2_all
     }
 
 
 def per_species_performance_paper(data_dict, metadata_frame, filter_sids : Optional[List[int]] = None, experiment_name : str = '', file=sys.stdout):  
+    r2score = R2Score(multioutput='raw_values')
+
     quant_idx = data_dict['forecasts'].shape[-1] // 2
     forecast_horizon = data_dict['forecasts'].shape[-2]
     
     print('Per-species data - %s' % experiment_name, file=file)
     print('-------------------------------------------------------------------------------------------------------------------------------', file=file)
-    print('Species Name & Support & MAE & MedianAE & MASE', file=file)
+    print('Species Name & Support & MAE & MedianAE & MASE & R2', file=file)
     print('-------------------------------------------------------------------------------------------------------------------------------', file=file)
 
     meatadata_frame_cat = metadata_frame.copy()
@@ -189,9 +204,12 @@ def per_species_performance_paper(data_dict, metadata_frame, filter_sids : Optio
             medianae = torch.median(torch.abs(forecasts_filt_clamp - targets_filt_clamp))
             mae = torch.mean(torch.abs(forecasts_filt_clamp - targets_filt_clamp))
             mase = torch.mean(torch.abs(forecasts_filt_clamp - targets_filt_clamp) / (torch.mean(torch.abs(naive_filt_clamp - targets_filt_clamp), dim=-1, keepdims=True) + 1)) 
-            print('%s & %i & %.4f & %.4f & %.4f \\\\' % (species_name, mask.sum(), mae, medianae,  mase), file=file)  
+            r2 = r2score(forecasts_filt_clamp, targets_filt_clamp).mean()
+            print('%s & %i & %.4f & %.4f & %.4f & %.4f \\\\' % (species_name, mask.sum(), mae, medianae,  mase, r2), file=file)  
         
 def per_sample_performance(data_dict, data_mask, sample_idx, file=sys.stdout) -> Tuple[float, float, float]:  
+    r2score = R2Score(multioutput='raw_values')
+
     quant_idx = data_dict['forecasts'].shape[-1] // 2
     forecast_horizon = data_dict['forecasts'].shape[-2]
     
@@ -205,6 +223,7 @@ def per_sample_performance(data_dict, data_mask, sample_idx, file=sys.stdout) ->
     medianae = torch.median(torch.abs(forecasts_filt_clamp - targets_filt_clamp))
     mae = torch.mean(torch.abs(forecasts_filt_clamp - targets_filt_clamp))
     mase = torch.mean(torch.abs(forecasts_filt_clamp - targets_filt_clamp) / (torch.mean(torch.abs(naive_filt_clamp - targets_filt_clamp), dim=-1, keepdims=True) + 1)) 
+    r2 = r2score(forecasts_filt_clamp, targets_filt_clamp).mean()
     
-    return mae, medianae, mase
+    return mae, medianae, mase, r2
         
