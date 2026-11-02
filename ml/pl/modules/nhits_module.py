@@ -10,13 +10,16 @@ from ml.pl.metrics.mase import MeanAbsoluteScaledPrecision
 from pytorch_lightning.cli import OptimizerCallable, LRSchedulerCallable
 
 class NHitsModule(pl.LightningModule):
-    def __init__(self, backcast_len : int, forecast_len : int, model : torch.nn.Module, loss : torch.nn.Module, optimizer : OptimizerCallable = torch.optim.Adam, lr_scheduler : LRSchedulerCallable = torch.optim.lr_scheduler.ConstantLR, monitor : str = None, interval : str = 'epoch') -> None:
+    def __init__(self, backcast_len : int, forecast_len : int, model : torch.nn.Module, loss : torch.nn.Module, use_future_covars : bool = True, use_past_target : bool = True, optimizer : OptimizerCallable = torch.optim.Adam, lr_scheduler : LRSchedulerCallable = torch.optim.lr_scheduler.ConstantLR, monitor : str = None, interval : str = 'epoch') -> None:
         super(NHitsModule, self).__init__()
         
         self.backcast_len = backcast_len
         self.forecast_len = forecast_len
         self.model = model
         self.loss_fn = loss
+
+        self.use_future_covars = use_future_covars
+        self.use_past_target = use_past_target
 
         self.optimizer = optimizer
         self.lr_scheduler = lr_scheduler
@@ -44,12 +47,13 @@ class NHitsModule(pl.LightningModule):
     def step(self, batch: Tuple[torch.Tensor]) -> Tuple[torch.Tensor]:
         inputs, _, targets = batch
 
-        #inputs = inputs[:, 0, :, :]
-        #targets = targets[:, 0, :, :]
+        past_targets = targets[:, :self.backcast_len, :] if self.use_past_target else torch.zeros_like(targets[:, :self.backcast_len, :])
+        past_covars = inputs[:, :self.backcast_len, :]
+        futr_covars = inputs[:, self.backcast_len:, :] if self.use_future_covars else None
 
-        y_pred, _, _, _ = self(targets[:, :self.backcast_len, :], inputs[:, :self.backcast_len, :], inputs[:, self.backcast_len:, :], None, None)
-        y_pred = y_pred.permute(0, 2, 1)
-      
+        y_pred, _, _, _ = self(past_targets, past_covars, futr_covars, None, None)
+        y_pred = y_pred.permute(0,2,1)
+       
         loss = self.loss_fn(y_pred, targets[:, -self.forecast_len:, :])
         
         return y_pred, targets[:, self.backcast_len-1:self.backcast_len, :], loss
