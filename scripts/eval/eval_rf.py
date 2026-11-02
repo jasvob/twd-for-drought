@@ -12,6 +12,8 @@ import time
 import argparse
 from pathlib import Path
 
+import h5py
+
 # Prepare command line argument parser
 arg_parser = argparse.ArgumentParser(
     prog='Evaluate Random Forest Regressor',
@@ -54,11 +56,13 @@ if __name__ == "__main__":
             filter_min_twd=cfg_test_dataset['treenet_data_frame']['init_args']['filter_min_twd'],
             merge_by_site=cfg_test_dataset['treenet_data_frame']['init_args']['merge_by_site'],
         ),
+        cache_path=cfg_test_dataset['cache_path'],
         input_feats=cfg_test_dataset['input_feats'],
         exog_feats=cfg_test_dataset['exog_feats'],
         target_feats=cfg_test_dataset['target_feats'],
         seq_len=cfg_test_dataset['seq_len'],
         max_dist_timesteps=cfg_test_dataset['max_dist_timesteps'],
+        selected_input_feats=cfg_test_dataset['selected_input_feats'],
         normalization=cfg_test_dataset['normalization'],
         norm_inputs=cfg_test_dataset['norm_inputs'],
         norm_exog=cfg_test_dataset['norm_exog'],
@@ -142,18 +146,15 @@ if __name__ == "__main__":
     series_ids = torch.cat(series_ids)
     inf_times = np.array(inf_times)
 
-    results = {
-        'inps': inps.numpy(),
-        'exogs': exogs.numpy(),
-        'bcast_tgts': bcast_tgts.numpy(),
-        'fcast_tgts': fcast_tgts.numpy(),
-        'forecasts': forecasts.numpy(),
-        'tstamps': tstamps.numpy(),
-        'site_ids': site_ids.numpy(),
-        'series_ids': series_ids.numpy(),
-        'inf_times': inf_times
-    }
-
-    np.savez(eval_path.joinpath('%s.npz' % Path(args.config).stem), results=results)
+    with h5py.File(eval_path.joinpath('%s.h5' % Path(args.config).stem), "w") as f:
+        f.create_dataset('inps', data=inps.numpy().astype(np.float32), dtype='f4')
+        f.create_dataset('exogs', data=exogs.numpy().astype(np.float32), dtype='f4')
+        f.create_dataset('bcast_tgts', data=bcast_tgts.numpy().astype(np.float32), dtype='f4')
+        f.create_dataset('fcast_tgts', data=fcast_tgts.numpy().astype(np.float32), dtype='f4')
+        f.create_dataset('forecasts', data=forecasts.numpy().astype(np.float32), dtype='f4')
+        f.create_dataset('tstamps', data=tstamps.numpy().astype(np.float32), dtype='f4')
+        f.create_dataset('site_ids', data=site_ids.numpy().astype(np.int32), dtype='i4')
+        f.create_dataset('series_ids', data=series_ids.numpy().astype(np.int32), dtype='i4')
+        f.create_dataset('inf_times', data=inf_times.astype(np.float32), dtype='f4')
 
     print('Done')
