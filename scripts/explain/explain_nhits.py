@@ -11,13 +11,15 @@ from torch.utils.data import DataLoader
 from utils.data.treenet_dataframe import TreeNetDataFrame
 from ml.data.treenet_dataset import TreeNetTemporalDataset
 
-from ml.models.nhits.model import NHitsNet, NHitsBlock, IdentityBasis
+from ml.models.nhits import NHitsNet, NHitsBlock, IdentityBasis
 
 import captum
 from captum.attr import GradientShap
 
 import argparse
 from pathlib import Path
+
+import h5py
 
 # Prepare command line argument parser
 arg_parser = argparse.ArgumentParser(
@@ -64,11 +66,13 @@ if __name__ == "__main__":
             filter_min_twd=cfg_train_dataset['treenet_data_frame']['init_args']['filter_min_twd'],
             merge_by_site=cfg_train_dataset['treenet_data_frame']['init_args']['merge_by_site'],
         ),
+        cache_path=None,
         input_feats=cfg_train_dataset['input_feats'],
         exog_feats=cfg_train_dataset['exog_feats'],
         target_feats=cfg_train_dataset['target_feats'],
         seq_len=cfg_train_dataset['seq_len'],
         max_dist_timesteps=cfg_train_dataset['max_dist_timesteps'],
+        selected_input_feats=cfg_train_dataset['selected_input_feats'],
         normalization=cfg_train_dataset['normalization'],
         norm_inputs=cfg_train_dataset['norm_inputs'],
         norm_exog=cfg_train_dataset['norm_exog'],
@@ -76,6 +80,44 @@ if __name__ == "__main__":
         target_only_growth=cfg_train_dataset['target_only_growth'],
         return_timestamp=True
     )
+
+    if len(dataset_train) == 0:
+        cfg_train_dataset = cfg['data']['init_args']['val_dataset']['init_args']
+        dataset_train = TreeNetTemporalDataset(
+            treenet_data_frame=TreeNetDataFrame(
+                data_file_path=cfg_train_dataset['treenet_data_frame']['init_args']['data_file_path'],
+                metadata_file_path=cfg_train_dataset['treenet_data_frame']['init_args']['metadata_file_path'],
+                metadata_filter_fn=cfg_train_dataset['treenet_data_frame']['init_args']['metadata_filter_fn'],
+                treedata_filter_fn=cfg_train_dataset['treenet_data_frame']['init_args']['treedata_filter_fn'],
+                cache_path=cfg_train_dataset['treenet_data_frame']['init_args']['cache_path'],
+                data_filter_fn='ts.dt.year == 2021 and series_id == %i' % args.series_id,
+                min_trees_per_site=cfg_train_dataset['treenet_data_frame']['init_args']['min_trees_per_site'],
+                equal_sequence_per_site=cfg_train_dataset['treenet_data_frame']['init_args']['equal_sequence_per_site'],
+                interpolate_data=cfg_train_dataset['treenet_data_frame']['init_args']['interpolate_data'],
+                drop_na_for_variables=cfg_train_dataset['treenet_data_frame']['init_args']['drop_na_for_variables'],
+                drop_na_for_metadata=cfg_train_dataset['treenet_data_frame']['init_args']['drop_na_for_metadata'],
+                resample_data=cfg_train_dataset['treenet_data_frame']['init_args']['resample_data'],
+                filter_growth_period=cfg_train_dataset['treenet_data_frame']['init_args']['filter_growth_period'],
+                filter_by_temperature=cfg_train_dataset['treenet_data_frame']['init_args']['filter_by_temperature'],
+                filter_by_frost=cfg_train_dataset['treenet_data_frame']['init_args']['filter_by_frost'],
+                filter_min_growth=cfg_train_dataset['treenet_data_frame']['init_args']['filter_min_growth'],
+                filter_min_twd=cfg_train_dataset['treenet_data_frame']['init_args']['filter_min_twd'],
+                merge_by_site=cfg_train_dataset['treenet_data_frame']['init_args']['merge_by_site'],
+            ),
+            cache_path=None,
+            input_feats=cfg_train_dataset['input_feats'],
+            exog_feats=cfg_train_dataset['exog_feats'],
+            target_feats=cfg_train_dataset['target_feats'],
+            seq_len=cfg_train_dataset['seq_len'],
+            max_dist_timesteps=cfg_train_dataset['max_dist_timesteps'],
+            selected_input_feats=cfg_train_dataset['selected_input_feats'],
+            normalization=cfg_train_dataset['normalization'],
+            norm_inputs=cfg_train_dataset['norm_inputs'],
+            norm_exog=cfg_train_dataset['norm_exog'],
+            norm_targets=cfg_train_dataset['norm_targets'],
+            target_only_growth=cfg_train_dataset['target_only_growth'],
+            return_timestamp=True
+        )
 
     dataset_test = TreeNetTemporalDataset(
         treenet_data_frame=TreeNetDataFrame(
@@ -98,11 +140,13 @@ if __name__ == "__main__":
             filter_min_twd=cfg_test_dataset['treenet_data_frame']['init_args']['filter_min_twd'],
             merge_by_site=cfg_test_dataset['treenet_data_frame']['init_args']['merge_by_site'],
         ),
+        cache_path=None,
         input_feats=cfg_test_dataset['input_feats'],
         exog_feats=cfg_test_dataset['exog_feats'],
         target_feats=cfg_test_dataset['target_feats'],
         seq_len=cfg_test_dataset['seq_len'],
         max_dist_timesteps=cfg_test_dataset['max_dist_timesteps'],
+        selected_input_feats=cfg_test_dataset['selected_input_feats'],
         normalization=cfg_test_dataset['normalization'],
         norm_inputs=cfg_test_dataset['norm_inputs'],
         norm_exog=cfg_test_dataset['norm_exog'],
@@ -204,6 +248,7 @@ if __name__ == "__main__":
     state_dict = {k.partition('model.')[2]: v for k,v in data['state_dict'].items()}    # Extract state_dict and remove 'model' prefix from weights added by Pytorch Lightning
     model.load_state_dict(state_dict)                                                   # Load state_dict into the model
     model.eval()
+    model = model.to(torch.float32)
 
     class ModelWrapper(nn.Module):
         def __init__(self, model : NHitsNet) -> None:
@@ -241,20 +286,21 @@ if __name__ == "__main__":
     base_inps_bcast_all = []
     base_inps_fcast_all = []
     for i in range(n_baselines):
+        print('Preparing baseline %i / %i...' % (i+1, n_baselines))
         base_inputs, base_exog, base_targets, _, _, _ = next(iter(dataloader_train))
         base_tgt_bcast = base_targets[:, :backcast_len, :]
         # defining model input tensors
-        base_tgt_bcast = torch.tensor(base_tgt_bcast, requires_grad=True)
-        base_inps_bcast = torch.tensor(base_inputs[:, :backcast_len, :], requires_grad=True)
-        base_inps_fcast = torch.tensor(base_inputs[:, -forecast_len:, :], requires_grad=True)
+        base_tgt_bcast = torch.tensor(base_tgt_bcast)
+        base_inps_bcast = torch.tensor(base_inputs[:, :backcast_len, :])
+        base_inps_fcast = torch.tensor(base_inputs[:, -forecast_len:, :])
 
         base_tgt_bcast_all.append(torch.mean(base_tgt_bcast, dim=0, keepdim=True))
         base_inps_bcast_all.append(torch.mean(base_inps_bcast, dim=0, keepdim=True))
         base_inps_fcast_all.append(torch.mean(base_inps_fcast, dim=0, keepdim=True))
 
-    base_tgt_bcast = torch.cat(base_tgt_bcast_all, dim=0).to('cuda')
-    base_inps_bcast = torch.cat(base_inps_bcast_all, dim=0).to('cuda')
-    base_inps_fcast = torch.cat(base_inps_fcast_all, dim=0).to('cuda')
+    base_tgt_bcast = torch.cat(base_tgt_bcast_all, dim=0).to(torch.float32).to('cuda')
+    base_inps_bcast = torch.cat(base_inps_bcast_all, dim=0).to(torch.float32).to('cuda')
+    base_inps_fcast = torch.cat(base_inps_fcast_all, dim=0).to(torch.float32).to('cuda')
 
     # defining and applying integrated gradients on ToyModel and the
     dlshap = GradientShap(model_wrapper, multiply_by_inputs=True)
@@ -274,43 +320,43 @@ if __name__ == "__main__":
         tgt_fcast = targets[:, -forecast_len:, :].to('cuda')
 
         # defining model input tensors
-        tgt_bcast = torch.tensor(tgt_bcast, requires_grad=True).to('cuda')
-        inps_bcast = torch.tensor(inputs[:, :backcast_len, :], requires_grad=True).to('cuda')
-        inps_fcast = torch.tensor(inputs[:, -forecast_len:, :], requires_grad=True).to('cuda')
+        tgt_bcast = torch.tensor(tgt_bcast).to('cuda').to(torch.float32)
+        inps_bcast = torch.tensor(inputs[:, :backcast_len, :]).to(torch.float32).to('cuda')
+        inps_fcast = torch.tensor(inputs[:, -forecast_len:, :]).to(torch.float32).to('cuda')
 
         all_attributions = []
         all_vars = []
         tstamps = []
-        for tgt_idx in range(forecast_len):
-            attributions, approximation_error = dlshap.attribute((tgt_bcast, inps_bcast, inps_fcast),
-                                                            baselines=(base_tgt_bcast, base_inps_bcast, base_inps_fcast),
-                                                            stdevs=0.025, 
-                                                            n_samples=32,
-                                                            target=tgt_idx,
-                                                            return_convergence_delta=True)
-                                                            
-            attrs_inps_all = torch.cat([attributions[1], attributions[2]], dim=1)
-            inps_all = torch.cat([inps_bcast, inps_fcast], dim=1)
 
-            attrs_tgt_all = torch.cat([attributions[0], torch.zeros_like(tgt_fcast)], dim=1)
-            tgts_all = torch.cat([tgt_bcast, tgt_fcast], dim=1)
+        tgt_bcast_rep = tgt_bcast.repeat_interleave(forecast_len, dim=0)
+        inps_bcast_rep = inps_bcast.repeat_interleave(forecast_len, dim=0)
+        inps_fcast_rep = inps_fcast.repeat_interleave(forecast_len, dim=0)
 
-            attrs_all = torch.cat([attrs_inps_all, attrs_tgt_all], dim=2)
-            inps_all = dataset_test.unnormalize_data(inps_all, dataset_test.normalization[0], norm_inputs_gpu)
-            tgts_all = dataset_test.unnormalize_data(tgts_all, dataset_test.normalization[2], norm_targets_gpu)
-            vars_all = torch.cat([inps_all, tgts_all], dim=2)
+        attributions = dlshap.attribute(
+            inputs=(tgt_bcast_rep, inps_bcast_rep, inps_fcast_rep),
+            baselines=(base_tgt_bcast, base_inps_bcast, base_inps_fcast),
+            stdevs=0.025, 
+            n_samples=32,
+            target=torch.arange(forecast_len, device=device)
+        )
 
-            all_attributions.append(attrs_all)
-            all_vars.append(vars_all)
+        attrs_inps_all = torch.cat([attributions[1], attributions[2]], dim=1)
+        inps_all = torch.cat([inps_bcast, inps_fcast], dim=1)
 
-        all_attributions = torch.stack(all_attributions, dim=0)
-        all_vars = torch.stack(all_vars, dim=0)
+        attrs_tgt_all = torch.cat([attributions[0], torch.zeros((forecast_len, tgt_fcast.shape[1], tgt_fcast.shape[2]), dtype=tgt_fcast.dtype, device=device)], dim=1)
+        tgts_all = torch.cat([tgt_bcast, tgt_fcast], dim=1)
 
-        pred = model_wrapper(tgt_bcast, inps_bcast, inps_fcast)
-        pred = dataset_test.unnormalize_data(pred, dataset_test.normalization[2], norm_targets_gpu)
+        attrs_all = torch.cat([attrs_inps_all, attrs_tgt_all], dim=2)
+        inps_all = dataset_test.unnormalize_data(inps_all, dataset_test.normalization[0], norm_inputs_gpu)
+        tgts_all = dataset_test.unnormalize_data(tgts_all, dataset_test.normalization[2], norm_targets_gpu)
+        vars_all = torch.cat([inps_all, tgts_all], dim=2)
 
-        series_attributions.append(all_attributions.detach().cpu().numpy())
-        series_vars.append(all_vars.detach().cpu().numpy())
+        with torch.no_grad():
+            pred = model_wrapper(tgt_bcast, inps_bcast, inps_fcast)
+            pred = dataset_test.unnormalize_data(pred, dataset_test.normalization[2], norm_targets_gpu)
+
+        series_attributions.append(attrs_all.detach().cpu().numpy())
+        series_vars.append(vars_all.detach().cpu().numpy())
         series_preds.append(pred.detach().cpu().numpy())
         series_tstamps.append(tstamp.detach().cpu().numpy())
 
@@ -319,18 +365,14 @@ if __name__ == "__main__":
     series_preds = np.stack(series_preds)
     series_tstamps = np.stack(series_tstamps)
 
-    if series_attributions.shape[0] > 1000:
-        for i in range((series_attributions.shape[0] // 1000) + 1):
-            results = {
-                'all_attributions': series_attributions[i*1000:(i+1)*1000],
-                'all_vars': series_vars[i*1000:(i+1)*1000],
-                'backcast_len': backcast_len,
-                'forecast_len': forecast_len,
-                'input_feats': dataset_test.input_feats,
-                'target_feats': dataset_test.target_feats,
-                'pred': series_preds[i*1000:(i+1)*1000],
-                'tstamp': series_tstamps[i*1000:(i+1)*1000],
-            }
-            np.savez(explain_path.joinpath('%s_%i_%i.npz' % (args.config.stem, args.series_id, i), results=results))
-
-    print('Done')
+    with h5py.File(explain_path.joinpath('%s_%i.h5' % (Path(args.config).stem, args.series_id)), "w") as f:
+        f.create_dataset('all_attributions', data=series_attributions.astype(np.float32), dtype='f4')
+        f.create_dataset('all_vars', data=series_vars.astype(np.float32), dtype='f4')
+        f.create_dataset('backcast_len', data=backcast_len, dtype="i4")
+        f.create_dataset('forecast_len', data=forecast_len, dtype="i4")
+        f.create_dataset('input_feats', data=dataset_test.input_feats, dtype=h5py.string_dtype(encoding="utf-8"))
+        f.create_dataset('target_feats', data=dataset_test.target_feats, dtype=h5py.string_dtype(encoding="utf-8"))
+        f.create_dataset('pred', data=series_preds.astype(np.float32), dtype='f4')
+        f.create_dataset('tstamp', data=series_tstamps.astype(np.float32), dtype='f4')
+                
+print('Done')
