@@ -63,17 +63,17 @@ To produce the figures and tables within the paper, several scripts are provided
 
 Performance tables and plot of performance of various tree species over forecasting horizon can be plotted using:
 ```
-PYTHONPATH=. python scripts/viz/plot_performance.py --data_path resources/dataset-treenet/ --output_path resources/ --model nhits
+PYTHONPATH=. python scripts/viz/plot_performance.py --data_path resources/dataset-treenet/ --output_path resources/ --eval_folder resources/eval/ --model nhits
 ```
 
 Qualitative visualizations of some forecasts can be plotted using:
 ```
-PYTHONPATH=. python scripts/viz/plot_forecasts.py --data_path resources/dataset-treenet/ --output_path resources/ --model nhits
+PYTHONPATH=. python scripts/viz/plot_forecasts.py --data_path resources/dataset-treenet/ --output_path resources/ --model nhits --samples main_eval
 ```
 
 Explanations of predictions of the model for one series over time can be plotted with:
 ```
-PYTHONPATH=. python scripts/viz/plot_series_explanation.py --data_path resources/dataset-treenet/ --output_path resources/ --series_id 160 --model nhits
+PYTHONPATH=. python scripts/viz/plot_series_explanation.py --data_path resources/dataset-treenet/ --output_path resources/ --series_ids 160,166,557 --model nhits
 ```
 
 Analysis of influence of different variables on TWD can be generated using:
