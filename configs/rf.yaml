@@ -1,3 +1,5 @@
+seed_everything: 42
+
 trainer: 
   accelerator: 'cuda'
   devices: 1
@@ -7,13 +9,13 @@ trainer:
   gradient_clip_algorithm: 'norm'
   overfit_batches: 0.0
   precision: 32
-  #log_every_n_steps: 50
 
   callbacks:
     - class_path: pytorch_lightning.callbacks.EarlyStopping
       init_args:
         monitor: 'val_smape'
         patience: 50
+        min_delta: 1e-5
         verbose: true
     - class_path: pytorch_lightning.callbacks.ModelCheckpoint
       init_args:
@@ -24,8 +26,6 @@ trainer:
         verbose: true
         auto_insert_metric_name: false
     - class_path: pytorch_lightning.callbacks.LearningRateMonitor
-      #init_args:
-      #  logging_interval: 'step'
   
   logger:
     - class_path: pytorch_lightning.loggers.MLFlowLogger
@@ -47,7 +47,7 @@ data:
             metadata_file_path: 'resources/dataset-treenet/metadata.parquet'
             metadata_filter_fn: ''
             treedata_filter_fn: ''
-            cache_path: 'resources/cache/cache_train_2hourly_all_merge_all'
+            cache_path: 'resources/cache/cache_train_2hourly_all_merge_all_review'
             data_filter_fn: 'ts.dt.year <= 2020'
             min_trees_per_site: 1
             equal_sequence_per_site: false
@@ -57,29 +57,31 @@ data:
             resample_data: ['2H', '0H']
             filter_growth_period: false
             filter_by_temperature: null
-            filter_by_frost: true
-            filter_min_growth: 200.0
+            filter_by_frost: false
+            filter_min_growth: null
             filter_min_twd: [0.9, 5.0]
             merge_by_site: 'median'
 
+        cache_path: 'resources/cache/dataset_train_2hourly_all_merge_all_review'
         input_feats: ['total_precip_log1p', 'rh', 'temp', 'swp_abs_log1p', 'vpd', 'rad']
         exog_feats: ['genus_id', 'species_id']
         target_feats: ['twd_norm']
         seq_len: 576 
         max_dist_timesteps: 1152
+        selected_input_feats: [0,1,2,3,4,5]
         normalization:
           - 'meanstd'
           - 'meanstd'
           - 'meanstd' 
         norm_inputs: 
-          - [0.09446577727794647, 69.16653442382812, 18.329605102539062, 4.541141986846924, 0.785040557384491, 242.7092742919922]
-          - [0.3368465304374695, 18.571338653564453, 5.245357990264893, 1.7042675018310547, 0.6858100891113281, 303.7917175292969]  
+          - [0.10143379122018814, 74.83631134033203, 9.819112777709961, 3.584704875946045, 0.42741748690605164, 147.60020446777344]
+          - [0.32363981008529663, 18.68497657775879, 8.241351127624512, 1.7104129791259766, 0.5159024000167847, 238.6620330810547]
         norm_exog: 
           - [0.0, 0.0]
           - [1.0, 1.0]
         norm_targets: 
-          - [0.6508476734161377]
-          - [0.807482898235321]
+          - [1.1013875007629395]
+          - [1.1089370250701904]
         target_only_growth: 192
         
     val_dataset:
@@ -92,7 +94,7 @@ data:
             metadata_file_path: ${data.init_args.train_dataset.init_args.treenet_data_frame.init_args.metadata_file_path}
             metadata_filter_fn: ${data.init_args.train_dataset.init_args.treenet_data_frame.init_args.metadata_filter_fn}
             treedata_filter_fn: ${data.init_args.train_dataset.init_args.treenet_data_frame.init_args.treedata_filter_fn}
-            cache_path: 'resources/cache/cache_val_2hourly_all_merge_all'
+            cache_path: 'resources/cache/cache_val_2hourly_all_merge_all_review'
             data_filter_fn: 'ts.dt.year == 2021'
             min_trees_per_site: ${data.init_args.train_dataset.init_args.treenet_data_frame.init_args.min_trees_per_site}
             equal_sequence_per_site: ${data.init_args.train_dataset.init_args.treenet_data_frame.init_args.equal_sequence_per_site}
@@ -106,11 +108,13 @@ data:
             filter_min_growth: ${data.init_args.train_dataset.init_args.treenet_data_frame.init_args.filter_min_growth}
             filter_min_twd: ${data.init_args.train_dataset.init_args.treenet_data_frame.init_args.filter_min_twd}
             merge_by_site: ${data.init_args.train_dataset.init_args.treenet_data_frame.init_args.merge_by_site}
+        cache_path: 'resources/cache/dataset_val_2hourly_all_merge_all_review'
         input_feats: ${data.init_args.train_dataset.init_args.input_feats}
         exog_feats: ${data.init_args.train_dataset.init_args.exog_feats}
         target_feats: ${data.init_args.train_dataset.init_args.target_feats}
         seq_len: ${data.init_args.train_dataset.init_args.seq_len}
         max_dist_timesteps: ${data.init_args.train_dataset.init_args.max_dist_timesteps}
+        selected_input_feats: ${data.init_args.train_dataset.init_args.selected_input_feats}
         normalization: ${data.init_args.train_dataset.init_args.normalization}
         norm_inputs: ${data.init_args.train_dataset.init_args.norm_inputs}
         norm_exog: ${data.init_args.train_dataset.init_args.norm_exog}
@@ -127,7 +131,7 @@ data:
             metadata_file_path: ${data.init_args.train_dataset.init_args.treenet_data_frame.init_args.metadata_file_path}
             metadata_filter_fn: ${data.init_args.train_dataset.init_args.treenet_data_frame.init_args.metadata_filter_fn}
             treedata_filter_fn: ${data.init_args.train_dataset.init_args.treenet_data_frame.init_args.treedata_filter_fn}
-            cache_path: 'resources/cache/cache_test_2hourly_all_merge_all'
+            cache_path: 'resources/cache/cache_test_2hourly_all_merge_all_review'
             data_filter_fn: 'ts.dt.year > 2021'
             min_trees_per_site: ${data.init_args.train_dataset.init_args.treenet_data_frame.init_args.min_trees_per_site}
             equal_sequence_per_site: ${data.init_args.train_dataset.init_args.treenet_data_frame.init_args.equal_sequence_per_site}
@@ -141,11 +145,13 @@ data:
             filter_min_growth: ${data.init_args.train_dataset.init_args.treenet_data_frame.init_args.filter_min_growth}
             filter_min_twd: ${data.init_args.train_dataset.init_args.treenet_data_frame.init_args.filter_min_twd}
             merge_by_site: ${data.init_args.train_dataset.init_args.treenet_data_frame.init_args.merge_by_site}
+        cache_path: 'resources/cache/dataset_test_2hourly_all_merge_all_review'
         input_feats: ${data.init_args.train_dataset.init_args.input_feats}
         exog_feats: ${data.init_args.train_dataset.init_args.exog_feats}
         target_feats: ${data.init_args.train_dataset.init_args.target_feats}
         seq_len: ${data.init_args.train_dataset.init_args.seq_len}
         max_dist_timesteps: ${data.init_args.train_dataset.init_args.max_dist_timesteps}
+        selected_input_feats: ${data.init_args.train_dataset.init_args.selected_input_feats}
         normalization: ${data.init_args.train_dataset.init_args.normalization}
         norm_inputs: ${data.init_args.train_dataset.init_args.norm_inputs}
         norm_exog: ${data.init_args.train_dataset.init_args.norm_exog}
@@ -153,8 +159,9 @@ data:
         target_only_growth: ${data.init_args.train_dataset.init_args.target_only_growth}
 
     batch_size: 128
-    num_workers: 4
+    num_workers: 8
     val_size: 0.1
+    generator_random_seed: ${seed_everything}
 
 model: 
   backcast_len: 384

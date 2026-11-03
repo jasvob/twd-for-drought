@@ -1,3 +1,5 @@
+seed_everything: 42
+
 trainer: 
   accelerator: 'cuda'
   devices: 1
@@ -7,7 +9,6 @@ trainer:
   gradient_clip_algorithm: 'norm'
   overfit_batches: 0.0
   precision: 32
-  #log_every_n_steps: 50
 
   callbacks:
     - class_path: pytorch_lightning.callbacks.EarlyStopping
@@ -25,13 +26,11 @@ trainer:
         verbose: true
         auto_insert_metric_name: false
     - class_path: pytorch_lightning.callbacks.LearningRateMonitor
-      #init_args:
-      #  logging_interval: 'step'
   
   logger:
     - class_path: pytorch_lightning.loggers.MLFlowLogger
       init_args:
-        experiment_name: 'nhits_noswp'
+        experiment_name: 'nhits_region_nord'
         run_name: 'exp1'
         tracking_uri: file:./experiments/${trainer.logger[0].init_args.experiment_name}
 
@@ -48,8 +47,8 @@ data:
             metadata_file_path: 'resources/dataset-treenet/metadata.parquet'
             metadata_filter_fn: ''
             treedata_filter_fn: ''
-            cache_path: 'resources/cache/cache_train_2hourly_all_merge_all'
-            data_filter_fn: 'ts.dt.year <= 2020'
+            cache_path: 'resources/cache/cache_train_2hourly_all_merge_all_review_reg_nord'
+            data_filter_fn: 'not site_id.isin([3,10,22,43,50,51,70,72,73,74,91,105,100,101,106,120,121])'
             min_trees_per_site: 1
             equal_sequence_per_site: false
             interpolate_data: false
@@ -58,65 +57,34 @@ data:
             resample_data: ['2H', '0H']
             filter_growth_period: false
             filter_by_temperature: null
-            filter_by_frost: true
-            filter_min_growth: 200.0
+            filter_by_frost: false
+            filter_min_growth: null
             filter_min_twd: [0.9, 5.0]
             merge_by_site: 'median'
 
-        input_feats: ['total_precip_log1p', 'rh', 'temp', 'vpd', 'rad']
+        cache_path: 'resources/cache/dataset_train_2hourly_all_merge_all_review_reg_nord'
+        input_feats: ['total_precip_log1p', 'rh', 'temp', 'swp_abs_log1p', 'vpd', 'rad']
         exog_feats: ['genus_id', 'species_id']
         target_feats: ['twd_norm']
         seq_len: 576 
         max_dist_timesteps: 1152
+        selected_input_feats: [0,1,2,3,4,5]
         normalization:
           - 'meanstd'
           - 'meanstd'
           - 'meanstd' 
-        norm_inputs: 
-          - [0.09446577727794647, 69.16653442382812, 18.329605102539062, 0.785040557384491, 242.7092742919922]
-          - [0.3368465304374695, 18.571338653564453, 5.245357990264893, 0.6858100891113281, 303.7917175292969]  
+        norm_inputs:  
+          - [0.09497631341218948, 69.94515228271484, 9.35409927368164, 3.909675359725952, 0.4880997836589813, 161.85626220703125]
+          - [0.31364938616752625, 19.368574142456055, 8.520793914794922, 1.8780639171600342, 0.5501474142074585, 253.29881286621094]                        
         norm_exog: 
           - [0.0, 0.0]
           - [1.0, 1.0]
         norm_targets: 
-          - [0.6508476734161377]
-          - [0.807482898235321]
+          - [1.336181402206421]
+          - [1.206157922744751]
         target_only_growth: 192
         
-    val_dataset:
-      class_path: ml.data.treenet_dataset.TreeNetTemporalDataset
-      init_args:
-        treenet_data_frame:
-          class_path:  utils.data.treenet_dataframe.TreeNetDataFrame
-          init_args: 
-            data_file_path:  ${data.init_args.train_dataset.init_args.treenet_data_frame.init_args.data_file_path}
-            metadata_file_path: ${data.init_args.train_dataset.init_args.treenet_data_frame.init_args.metadata_file_path}
-            metadata_filter_fn: ${data.init_args.train_dataset.init_args.treenet_data_frame.init_args.metadata_filter_fn}
-            treedata_filter_fn: ${data.init_args.train_dataset.init_args.treenet_data_frame.init_args.treedata_filter_fn}
-            cache_path: 'resources/cache/cache_val_2hourly_all_merge_all'
-            data_filter_fn: 'ts.dt.year == 2021'
-            min_trees_per_site: ${data.init_args.train_dataset.init_args.treenet_data_frame.init_args.min_trees_per_site}
-            equal_sequence_per_site: ${data.init_args.train_dataset.init_args.treenet_data_frame.init_args.equal_sequence_per_site}
-            interpolate_data: ${data.init_args.train_dataset.init_args.treenet_data_frame.init_args.interpolate_data}
-            drop_na_for_variables: ${data.init_args.train_dataset.init_args.treenet_data_frame.init_args.drop_na_for_variables}
-            drop_na_for_metadata: ${data.init_args.train_dataset.init_args.treenet_data_frame.init_args.drop_na_for_metadata}
-            resample_data: ${data.init_args.train_dataset.init_args.treenet_data_frame.init_args.resample_data}
-            filter_growth_period: ${data.init_args.train_dataset.init_args.treenet_data_frame.init_args.filter_growth_period}
-            filter_by_temperature: ${data.init_args.train_dataset.init_args.treenet_data_frame.init_args.filter_by_temperature}
-            filter_by_frost: ${data.init_args.train_dataset.init_args.treenet_data_frame.init_args.filter_by_frost}
-            filter_min_growth: ${data.init_args.train_dataset.init_args.treenet_data_frame.init_args.filter_min_growth}
-            filter_min_twd: ${data.init_args.train_dataset.init_args.treenet_data_frame.init_args.filter_min_twd}
-            merge_by_site: ${data.init_args.train_dataset.init_args.treenet_data_frame.init_args.merge_by_site}
-        input_feats: ${data.init_args.train_dataset.init_args.input_feats}
-        exog_feats: ${data.init_args.train_dataset.init_args.exog_feats}
-        target_feats: ${data.init_args.train_dataset.init_args.target_feats}
-        seq_len: ${data.init_args.train_dataset.init_args.seq_len}
-        max_dist_timesteps: ${data.init_args.train_dataset.init_args.max_dist_timesteps}
-        normalization: ${data.init_args.train_dataset.init_args.normalization}
-        norm_inputs: ${data.init_args.train_dataset.init_args.norm_inputs}
-        norm_exog: ${data.init_args.train_dataset.init_args.norm_exog}
-        norm_targets: ${data.init_args.train_dataset.init_args.norm_targets}
-        target_only_growth: ${data.init_args.train_dataset.init_args.target_only_growth}
+    val_dataset: null
 
     test_dataset:
       class_path: ml.data.treenet_dataset.TreeNetTemporalDataset
@@ -128,8 +96,8 @@ data:
             metadata_file_path: ${data.init_args.train_dataset.init_args.treenet_data_frame.init_args.metadata_file_path}
             metadata_filter_fn: ${data.init_args.train_dataset.init_args.treenet_data_frame.init_args.metadata_filter_fn}
             treedata_filter_fn: ${data.init_args.train_dataset.init_args.treenet_data_frame.init_args.treedata_filter_fn}
-            cache_path: 'resources/cache/cache_test_2hourly_all_merge_all'
-            data_filter_fn: 'ts.dt.year > 2021'
+            cache_path: 'resources/cache/cache_test_2hourly_all_merge_all_review_reg_nord'
+            data_filter_fn: 'site_id.isin([3,10,22,43,50,51,70,72,73,74,91,105,100,101,106,120,121])'
             min_trees_per_site: ${data.init_args.train_dataset.init_args.treenet_data_frame.init_args.min_trees_per_site}
             equal_sequence_per_site: ${data.init_args.train_dataset.init_args.treenet_data_frame.init_args.equal_sequence_per_site}
             interpolate_data: ${data.init_args.train_dataset.init_args.treenet_data_frame.init_args.interpolate_data}
@@ -142,11 +110,13 @@ data:
             filter_min_growth: ${data.init_args.train_dataset.init_args.treenet_data_frame.init_args.filter_min_growth}
             filter_min_twd: ${data.init_args.train_dataset.init_args.treenet_data_frame.init_args.filter_min_twd}
             merge_by_site: ${data.init_args.train_dataset.init_args.treenet_data_frame.init_args.merge_by_site}
+        cache_path: 'resources/cache/dataset_test_2hourly_all_merge_all_review_reg_nord'
         input_feats: ${data.init_args.train_dataset.init_args.input_feats}
         exog_feats: ${data.init_args.train_dataset.init_args.exog_feats}
         target_feats: ${data.init_args.train_dataset.init_args.target_feats}
         seq_len: ${data.init_args.train_dataset.init_args.seq_len}
         max_dist_timesteps: ${data.init_args.train_dataset.init_args.max_dist_timesteps}
+        selected_input_feats: ${data.init_args.train_dataset.init_args.selected_input_feats}
         normalization: ${data.init_args.train_dataset.init_args.normalization}
         norm_inputs: ${data.init_args.train_dataset.init_args.norm_inputs}
         norm_exog: ${data.init_args.train_dataset.init_args.norm_exog}
@@ -154,26 +124,28 @@ data:
         target_only_growth: ${data.init_args.train_dataset.init_args.target_only_growth}
 
     batch_size: 128
-    num_workers: 4
+    num_workers: 8
     val_size: 0.1
+    generator_random_seed: ${seed_everything}
 
 model: 
   class_path: ml.pl.modules.nhits_module.NHitsModule
   init_args:
     backcast_len: 384
     forecast_len: 192
+    use_future_covars: true
 
     model: 
-      class_path: ml.models.nhits.model.NHitsNet
+      class_path: ml.models.nhits.NHitsNet
       init_args:
         naive_level: true
         blocks:
-          - class_path: ml.models.nhits.model.NHitsBlock
+          - class_path: ml.models.nhits.NHitsBlock
             init_args:
               backcast_len: ${model.init_args.backcast_len}
               forecast_len: ${model.init_args.forecast_len}
-              inp_time_hist_dim: 5
-              inp_time_futr_dim: 5
+              inp_time_hist_dim: 6
+              inp_time_futr_dim: 6
               output_dim: 5
               hidden_dim: 0
               inp_stat_dim: 0
@@ -193,19 +165,19 @@ model:
                   stride: 24
                   ceil_mode: true
               basis_fn: 
-                class_path: ml.models.nhits.model.IdentityBasis
+                class_path: ml.models.nhits.IdentityBasis
                 init_args:
                   backcast_len: ${model.init_args.backcast_len}
                   forecast_len: ${model.init_args.forecast_len}
                   output_dim:  ${model.init_args.model.init_args.blocks[0].init_args.output_dim}
                   interpolation_mode: 'linear'
 
-          - class_path: ml.models.nhits.model.NHitsBlock
+          - class_path: ml.models.nhits.NHitsBlock
             init_args:
               backcast_len: ${model.init_args.backcast_len}
               forecast_len: ${model.init_args.forecast_len}
-              inp_time_hist_dim: 5
-              inp_time_futr_dim: 5
+              inp_time_hist_dim: 6
+              inp_time_futr_dim: 6
               output_dim: 5
               hidden_dim: 0
               inp_stat_dim: 0
@@ -225,19 +197,19 @@ model:
                   stride: 12
                   ceil_mode: true
               basis_fn: 
-                class_path: ml.models.nhits.model.IdentityBasis
+                class_path: ml.models.nhits.IdentityBasis
                 init_args:
                   backcast_len: ${model.init_args.backcast_len}
                   forecast_len: ${model.init_args.forecast_len}
                   output_dim:  ${model.init_args.model.init_args.blocks[0].init_args.output_dim}
                   interpolation_mode: 'linear'
                   
-          - class_path: ml.models.nhits.model.NHitsBlock
+          - class_path: ml.models.nhits.NHitsBlock
             init_args:
               backcast_len: ${model.init_args.backcast_len}
               forecast_len: ${model.init_args.forecast_len}
-              inp_time_hist_dim: 5
-              inp_time_futr_dim: 5
+              inp_time_hist_dim: 6
+              inp_time_futr_dim: 6
               output_dim: 5
               hidden_dim: 0
               inp_stat_dim: 0
@@ -257,19 +229,19 @@ model:
                   stride: 6
                   ceil_mode: true
               basis_fn: 
-                class_path: ml.models.nhits.model.IdentityBasis
+                class_path: ml.models.nhits.IdentityBasis
                 init_args:
                   backcast_len: ${model.init_args.backcast_len}
                   forecast_len: ${model.init_args.forecast_len}
                   output_dim:  ${model.init_args.model.init_args.blocks[0].init_args.output_dim}
                   interpolation_mode: 'linear'
 
-          - class_path: ml.models.nhits.model.NHitsBlock
+          - class_path: ml.models.nhits.NHitsBlock
             init_args:
               backcast_len: ${model.init_args.backcast_len}
               forecast_len: ${model.init_args.forecast_len}
-              inp_time_hist_dim: 5
-              inp_time_futr_dim: 5
+              inp_time_hist_dim: 6
+              inp_time_futr_dim: 6
               output_dim: 5
               hidden_dim: 0
               inp_stat_dim: 0
@@ -289,7 +261,7 @@ model:
                   stride: 2
                   ceil_mode: true
               basis_fn: 
-                class_path: ml.models.nhits.model.IdentityBasis
+                class_path: ml.models.nhits.IdentityBasis
                 init_args:
                   backcast_len: ${model.init_args.backcast_len}
                   forecast_len: ${model.init_args.forecast_len}
@@ -312,11 +284,11 @@ model:
     lr_scheduler:
       class_path: ml.pl.schedulers.cosine_annealing_with_warmup.CosineAnnealingWarmupRestarts
       init_args:
-        first_cycle_steps: 12980
+        first_cycle_steps: 12476 # 22420
         cycle_mult: 2.0
         max_lr: 0.001
         min_lr: 0.000001
-        warmup_steps: 1298
+        warmup_steps: 1247 # 2242
         gamma: 0.7
 
     monitor: 'train_loss'
